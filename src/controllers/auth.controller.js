@@ -48,13 +48,13 @@ class AuthController {
         );
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      // const hashedPassword = await bcrypt.hash(password, 10);
       const userRole = role || accountType || "attendee";
 
       const user = await dataStore.createUser({
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        password: hashedPassword,
+        password,
         role: userRole,
         accountType: userRole,
         phone: phone ? phone.trim() : "",
@@ -118,12 +118,13 @@ class AuthController {
 
       const user = await dataStore.findUserByEmail(email);
       if (!user) {
-        return ApiResponse.error(res, "Invalid email or password.", 401);
+        return ApiResponse.error(res, "Invalid email.", 401);
       }
 
-      const isMatch = await bcrypt.compare(password, user.password);
+      // const isMatch = await bcrypt.compare(password, user.password);
+      const isMatch = await user.matchPassword(password);
       if (!isMatch) {
-        return ApiResponse.error(res, "Invalid email or password.", 401);
+        return ApiResponse.error(res, "Invalid password.", 401);
       }
 
       const token = generateAccessToken(user);
