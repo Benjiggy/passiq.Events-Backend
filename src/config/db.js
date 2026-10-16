@@ -1,31 +1,18 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
+require("dotenv").config();
 
-let isConnected = false;
+const db = process.env.DB;
+
+// readyState: 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+const isDbConnected = () => mongoose.connection.readyState === 1;
 
 const connectDB = async () => {
-  if (isConnected) return;
-
-  const mongoURI = process.env.MONGODB_URI;
-
-  if (!mongoURI || mongoURI === 'memory') {
-    console.log('[Database] Running in in-memory hybrid storage mode.');
-    isConnected = false;
-    return;
-  }
-
   try {
-    const conn = await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 1000, // 1s timeout
-    });
-
-    isConnected = true;
-    console.log(`[Database] MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.log(`[Database] Running in in-memory hybrid storage mode (MongoDB not connected: ${error.message}).`);
-    isConnected = false;
+    await mongoose.connect(db);
+    console.log("Database connection established");
+  } catch (err) {
+    console.log(`Error connecting to database: ${err.message}`);
   }
 };
-
-const isDbConnected = () => isConnected;
 
 module.exports = { connectDB, isDbConnected };
