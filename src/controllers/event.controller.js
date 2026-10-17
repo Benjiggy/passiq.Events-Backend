@@ -1,7 +1,7 @@
-const dataStore = require('../models/dataStore');
-const ApiResponse = require('../utils/apiResponse');
-const { DEFAULT_CATEGORIES } = require('../config/constants');
-const { toKobo } = require('../utils/formatters');
+const dataStore = require("../models/dataStore");
+const ApiResponse = require("../utils/apiResponse");
+const { DEFAULT_CATEGORIES } = require("../config/constants");
+const { toKobo } = require("../utils/formatters");
 
 class EventController {
   /**
@@ -13,18 +13,18 @@ class EventController {
       const { category, search, city, featured, status } = req.query;
 
       const events = await dataStore.listEvents({
-        status: status || 'published',
+        status: status || "published",
         category,
         search,
-        featured: featured ? featured === 'true' : undefined
+        featured: featured ? featured === "true" : undefined,
       });
 
       return res.status(200).json({
         success: true,
-        status: 'success',
+        status: "success",
         events,
         data: events,
-        total: events.length
+        total: events.length,
       });
     } catch (error) {
       next(error);
@@ -41,41 +41,10 @@ class EventController {
       const event = await dataStore.getEventByIdOrSlug(idOrSlug);
 
       if (!event) {
-        return ApiResponse.error(res, 'Event not found', 404);
+        return ApiResponse.error(res, "Event not found", 404);
       }
 
       return res.status(200).json(event);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Get Event Categories
-   * GET /api/events/categories
-   */
-  static async getCategories(req, res, next) {
-    try {
-      const events = await dataStore.listEvents({ status: 'published' });
-      const counts = {};
-      DEFAULT_CATEGORIES.forEach(c => { counts[c] = 0; });
-      
-      events.forEach(e => {
-        if (e.category) {
-          counts[e.category] = (counts[e.category] || 0) + 1;
-        }
-      });
-
-      const categories = [
-        { id: 'all', name: 'All Events', count: events.length },
-        ...DEFAULT_CATEGORIES.map(name => ({
-          id: name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-          name,
-          count: counts[name] || 0
-        }))
-      ];
-
-      return ApiResponse.success(res, 'Categories retrieved', { categories });
     } catch (error) {
       next(error);
     }
@@ -89,52 +58,60 @@ class EventController {
     try {
       const {
         title,
-        category = 'Music & Concerts',
+        category = "Music & Concerts",
         date,
-        time = '18:00',
+        time = "18:00",
         location,
-        city = 'Lagos',
-        country = 'Nigeria',
+        city = "Lagos",
+        country = "Nigeria",
         price = 0,
         capacity = 100,
-        status = 'published',
-        description = '',
-        subtitle = '',
-        image = '',
-        poster = '',
-        ticketTiers
+        status = "published",
+        description = "",
+        subtitle = "",
+        image = "",
+        poster = "",
+        ticketTiers,
       } = req.body;
 
       if (!title || !date || !location) {
-        return ApiResponse.error(res, 'Title, date, and venue location are required.', 400);
+        return ApiResponse.error(
+          res,
+          "Title, date, and venue location are required.",
+          400,
+        );
       }
 
-      const slug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`;
+      const slug = `${title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")}-${Date.now().toString(36)}`;
       const numericPrice = Number(price) || 0;
       const numericCapacity = Number(capacity) || 100;
 
       // Setup default ticket tier if not explicitly provided
-      const defaultTiers = Array.isArray(ticketTiers) && ticketTiers.length > 0
-        ? ticketTiers.map((t, idx) => ({
-            id: t.id || `tier_${idx + 1}`,
-            name: t.name || 'General Admission',
-            price: Number(t.price) || 0,
-            unitAmountKobo: toKobo(t.price || 0),
-            capacity: Number(t.capacity) || numericCapacity,
-            sold: 0,
-            description: t.description || 'Standard access ticket pass.'
-          }))
-        : [
-            {
-              id: `${slug}-general`,
-              name: 'General Admission',
-              price: numericPrice,
-              unitAmountKobo: toKobo(numericPrice),
-              capacity: numericCapacity,
+      const defaultTiers =
+        Array.isArray(ticketTiers) && ticketTiers.length > 0
+          ? ticketTiers.map((t, idx) => ({
+              id: t.id || `tier_${idx + 1}`,
+              name: t.name || "General Admission",
+              price: Number(t.price) || 0,
+              unitAmountKobo: toKobo(t.price || 0),
+              capacity: Number(t.capacity) || numericCapacity,
               sold: 0,
-              description: 'Standard access ticket pass.'
-            }
-          ];
+              description: t.description || "Standard access ticket pass.",
+            }))
+          : [
+              {
+                id: `${slug}-general`,
+                name: "General Admission",
+                price: numericPrice,
+                unitAmountKobo: toKobo(numericPrice),
+                capacity: numericCapacity,
+                sold: 0,
+                description: "Standard access ticket pass.",
+              },
+            ];
 
       const newEvent = await dataStore.createEvent({
         title: title.trim(),
@@ -148,35 +125,42 @@ class EventController {
         address: location.trim(),
         city,
         country,
-        currency: 'NGN',
+        currency: "NGN",
         price: numericPrice,
         minPrice: numericPrice,
         maxPrice: numericPrice,
         capacity: numericCapacity,
         soldCount: 0,
-        image: image || 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&w=1200&q=80',
-        poster: poster || image || '',
-        status: status || 'published',
-        completionStatus: 'upcoming',
+        image:
+          image ||
+          "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&w=1200&q=80",
+        poster: poster || image || "",
+        status: status || "published",
+        completionStatus: "upcoming",
         ownerId: req.user.id,
         organizer: {
-          name: req.user.name || 'Passiq Organizer',
+          name: req.user.name || "Passiq Organizer",
           email: req.user.email,
-          phone: req.user.phone || '',
-          verified: true
+          phone: req.user.phone || "",
+          verified: true,
         },
         directions: {
           venueName: location.trim(),
-          shortCode: 'GATE-A',
+          shortCode: "GATE-A",
           address: location.trim(),
           rating: 4.8,
           reviewCount: 24,
-          googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}`
+          googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}`,
         },
-        ticketTiers: defaultTiers
+        ticketTiers: defaultTiers,
       });
 
-      return ApiResponse.success(res, 'Event created successfully', newEvent, 201);
+      return ApiResponse.success(
+        res,
+        "Event created successfully",
+        newEvent,
+        201,
+      );
     } catch (error) {
       next(error);
     }
@@ -189,7 +173,7 @@ class EventController {
   static async listOwnEvents(req, res, next) {
     try {
       const events = await dataStore.listEvents({ ownerId: req.user.id });
-      return ApiResponse.success(res, 'Your hosted events', events);
+      return ApiResponse.success(res, "Your hosted events", events);
     } catch (error) {
       next(error);
     }
@@ -204,14 +188,25 @@ class EventController {
       const { id } = req.params;
       const event = await dataStore.getEventByIdOrSlug(id);
 
-      if (!event) return ApiResponse.error(res, 'Event not found', 404);
+      if (!event) return ApiResponse.error(res, "Event not found", 404);
 
-      if ((event.ownerId?.id || event.ownerId)?.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
-        return ApiResponse.error(res, 'You do not have permission to edit this event.', 403);
+      if (
+        (event.ownerId?.id || event.ownerId)?.toString() !==
+          req.user.id.toString() &&
+        req.user.role !== "admin"
+      ) {
+        return ApiResponse.error(
+          res,
+          "You do not have permission to edit this event.",
+          403,
+        );
       }
 
-      const updated = await dataStore.updateEvent(event.id || event._id, req.body);
-      return ApiResponse.success(res, 'Event updated successfully', updated);
+      const updated = await dataStore.updateEvent(
+        event.id || event._id,
+        req.body,
+      );
+      return ApiResponse.success(res, "Event updated successfully", updated);
     } catch (error) {
       next(error);
     }
@@ -227,15 +222,19 @@ class EventController {
       const { status } = req.body;
 
       const event = await dataStore.getEventByIdOrSlug(id);
-      if (!event) return ApiResponse.error(res, 'Event not found', 404);
+      if (!event) return ApiResponse.error(res, "Event not found", 404);
 
-      if ((event.ownerId?.id || event.ownerId)?.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
-        return ApiResponse.error(res, 'Access denied.', 403);
+      if (
+        (event.ownerId?.id || event.ownerId)?.toString() !==
+          req.user.id.toString() &&
+        req.user.role !== "admin"
+      ) {
+        return ApiResponse.error(res, "Access denied.", 403);
       }
 
       const updated = await dataStore.updateEvent(event.id || event._id, {
         status,
-        ...(status === 'completed' ? { completionStatus: 'completed' } : {})
+        ...(status === "completed" ? { completionStatus: "completed" } : {}),
       });
 
       return ApiResponse.success(res, `Event status set to ${status}`, updated);
@@ -252,14 +251,18 @@ class EventController {
     try {
       const { id } = req.params;
       const event = await dataStore.getEventByIdOrSlug(id);
-      if (!event) return ApiResponse.error(res, 'Event not found', 404);
+      if (!event) return ApiResponse.error(res, "Event not found", 404);
 
-      if ((event.ownerId?.id || event.ownerId)?.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
-        return ApiResponse.error(res, 'Access denied.', 403);
+      if (
+        (event.ownerId?.id || event.ownerId)?.toString() !==
+          req.user.id.toString() &&
+        req.user.role !== "admin"
+      ) {
+        return ApiResponse.error(res, "Access denied.", 403);
       }
 
       await dataStore.deleteEvent(event.id || event._id);
-      return ApiResponse.success(res, 'Event deleted successfully');
+      return ApiResponse.success(res, "Event deleted successfully");
     } catch (error) {
       next(error);
     }

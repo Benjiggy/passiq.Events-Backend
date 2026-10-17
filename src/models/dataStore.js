@@ -2,16 +2,17 @@
  * Hybrid Data Repository
  * Provides unified interface across MongoDB models and robust in-memory data store.
  */
-const { isDbConnected } = require('../config/db');
-const User = require('./User');
-const Event = require('./Event');
-const Ticket = require('./Ticket');
-const Order = require('./Order');
-const Payment = require('./Payment');
-const Withdrawal = require('./Withdrawal');
-const Discount = require('./Discount');
-const Blog = require('./Blog');
-const { Memory, Newsletter } = require('./Memory');
+const { isDbConnected } = require("../config/db");
+const User = require("./User");
+const Event = require("./Event");
+const Ticket = require("./Ticket");
+const Order = require("./Order");
+const Payment = require("./Payment");
+const Withdrawal = require("./Withdrawal");
+const Discount = require("./Discount");
+const Blog = require("./Blog");
+const Category = require("./Category");
+const { Memory, Newsletter } = require("./Memory");
 
 // In-Memory Storage Cache
 const memoryStore = {
@@ -23,8 +24,9 @@ const memoryStore = {
   withdrawals: [],
   discounts: [],
   blogs: [],
+  categories: [],
   memories: [],
-  newsletters: []
+  newsletters: [],
 };
 
 const dataStore = {
@@ -33,16 +35,26 @@ const dataStore = {
   // User Operations
   async findUserByEmail(email) {
     if (isDbConnected()) {
-      return await User.findOne({ email: email.toLowerCase() }).select('+password');
+      return await User.findOne({ email: email.toLowerCase() }).select(
+        "+password",
+      );
     }
-    return memoryStore.users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
+    return (
+      memoryStore.users.find(
+        (u) => u.email.toLowerCase() === email.toLowerCase(),
+      ) || null
+    );
   },
 
   async findUserById(id) {
     if (isDbConnected()) {
       return await User.findById(id);
     }
-    return memoryStore.users.find(u => (u.id || u._id)?.toString() === id?.toString()) || null;
+    return (
+      memoryStore.users.find(
+        (u) => (u.id || u._id)?.toString() === id?.toString(),
+      ) || null
+    );
   },
 
   async createUser(userData) {
@@ -55,10 +67,10 @@ const dataStore = {
       id,
       _id: id,
       ...userData,
-      role: userData.role || userData.accountType || 'attendee',
-      accountType: userData.accountType || userData.role || 'attendee',
+      role: userData.role || userData.accountType || "attendee",
+      accountType: userData.accountType || userData.role || "attendee",
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     memoryStore.users.push(user);
     return user;
@@ -68,9 +80,15 @@ const dataStore = {
     if (isDbConnected()) {
       return await User.findByIdAndUpdate(id, updateData, { new: true });
     }
-    const index = memoryStore.users.findIndex(u => (u.id || u._id)?.toString() === id?.toString());
+    const index = memoryStore.users.findIndex(
+      (u) => (u.id || u._id)?.toString() === id?.toString(),
+    );
     if (index !== -1) {
-      memoryStore.users[index] = { ...memoryStore.users[index], ...updateData, updatedAt: new Date().toISOString() };
+      memoryStore.users[index] = {
+        ...memoryStore.users[index],
+        ...updateData,
+        updatedAt: new Date().toISOString(),
+      };
       return memoryStore.users[index];
     }
     return null;
@@ -83,24 +101,62 @@ const dataStore = {
     return memoryStore.users;
   },
 
+  // Category Operations
+  async listCategories() {
+    if (isDbConnected()) {
+      return await Category.find();
+    }
+    return memoryStore.categories;
+  },
+
+  async createCategory(categoryData) {
+    if (isDbConnected()) {
+      const category = new Category(categoryData);
+      return await category.save();
+    }
+    const id = `category_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const category = {
+      id,
+      _id: id,
+      ...categoryData,
+    };
+    memoryStore.categories.push(category);
+    return category;
+  },
+
   // Event Operations
   async listEvents(filter = {}) {
     if (isDbConnected()) {
       const query = {};
       if (filter.status) query.status = filter.status;
-      if (filter.category && filter.category !== 'All') query.category = filter.category;
+      if (filter.category && filter.category !== "All")
+        query.category = filter.category;
       if (filter.ownerId) query.ownerId = filter.ownerId;
       if (filter.featured !== undefined) query.featured = filter.featured;
       return await Event.find(query).sort({ date: 1, createdAt: -1 });
     }
     let results = [...memoryStore.events];
-    if (filter.status) results = results.filter(e => e.status === filter.status);
-    if (filter.category && filter.category !== 'All') results = results.filter(e => e.category === filter.category);
-    if (filter.ownerId) results = results.filter(e => (e.ownerId?.id || e.ownerId)?.toString() === filter.ownerId?.toString());
-    if (filter.featured !== undefined) results = results.filter(e => Boolean(e.featured) === Boolean(filter.featured));
+    if (filter.status)
+      results = results.filter((e) => e.status === filter.status);
+    if (filter.category && filter.category !== "All")
+      results = results.filter((e) => e.category === filter.category);
+    if (filter.ownerId)
+      results = results.filter(
+        (e) =>
+          (e.ownerId?.id || e.ownerId)?.toString() ===
+          filter.ownerId?.toString(),
+      );
+    if (filter.featured !== undefined)
+      results = results.filter(
+        (e) => Boolean(e.featured) === Boolean(filter.featured),
+      );
     if (filter.search) {
       const term = filter.search.toLowerCase();
-      results = results.filter(e => e.title?.toLowerCase().includes(term) || e.location?.toLowerCase().includes(term));
+      results = results.filter(
+        (e) =>
+          e.title?.toLowerCase().includes(term) ||
+          e.location?.toLowerCase().includes(term),
+      );
     }
     return results;
   },
@@ -108,11 +164,20 @@ const dataStore = {
   async getEventByIdOrSlug(idOrSlug) {
     if (isDbConnected()) {
       return await Event.findOne({
-        $or: [{ slug: idOrSlug.toLowerCase() }, { _id: idOrSlug.match(/^[0-9a-fA-F]{24}$/) ? idOrSlug : null }]
+        $or: [
+          { slug: idOrSlug.toLowerCase() },
+          { _id: idOrSlug.match(/^[0-9a-fA-F]{24}$/) ? idOrSlug : null },
+        ],
       });
     }
-    const target = String(idOrSlug || '').toLowerCase();
-    return memoryStore.events.find(e => (e.id || e._id)?.toString().toLowerCase() === target || e.slug?.toLowerCase() === target) || null;
+    const target = String(idOrSlug || "").toLowerCase();
+    return (
+      memoryStore.events.find(
+        (e) =>
+          (e.id || e._id)?.toString().toLowerCase() === target ||
+          e.slug?.toLowerCase() === target,
+      ) || null
+    );
   },
 
   async createEvent(eventData) {
@@ -127,7 +192,7 @@ const dataStore = {
       slug: eventData.slug || id,
       ...eventData,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     memoryStore.events.unshift(event);
     return event;
@@ -137,9 +202,15 @@ const dataStore = {
     if (isDbConnected()) {
       return await Event.findByIdAndUpdate(id, updateData, { new: true });
     }
-    const index = memoryStore.events.findIndex(e => (e.id || e._id)?.toString() === id?.toString());
+    const index = memoryStore.events.findIndex(
+      (e) => (e.id || e._id)?.toString() === id?.toString(),
+    );
     if (index !== -1) {
-      memoryStore.events[index] = { ...memoryStore.events[index], ...updateData, updatedAt: new Date().toISOString() };
+      memoryStore.events[index] = {
+        ...memoryStore.events[index],
+        ...updateData,
+        updatedAt: new Date().toISOString(),
+      };
       return memoryStore.events[index];
     }
     return null;
@@ -149,7 +220,9 @@ const dataStore = {
     if (isDbConnected()) {
       return await Event.findByIdAndDelete(id);
     }
-    const index = memoryStore.events.findIndex(e => (e.id || e._id)?.toString() === id?.toString());
+    const index = memoryStore.events.findIndex(
+      (e) => (e.id || e._id)?.toString() === id?.toString(),
+    );
     if (index !== -1) {
       return memoryStore.events.splice(index, 1)[0];
     }
@@ -167,7 +240,7 @@ const dataStore = {
       id,
       _id: id,
       ...ticketData,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     memoryStore.tickets.push(ticket);
     return ticket;
@@ -178,37 +251,58 @@ const dataStore = {
       const conditions = [];
       if (userId) conditions.push({ buyerId: userId });
       if (email) conditions.push({ userEmail: email.toLowerCase() });
-      return await Ticket.find(conditions.length ? { $or: conditions } : {}).sort({ createdAt: -1 });
+      return await Ticket.find(
+        conditions.length ? { $or: conditions } : {},
+      ).sort({ createdAt: -1 });
     }
     return memoryStore.tickets
-      .filter(t => (userId && (t.buyerId?.id || t.buyerId)?.toString() === userId?.toString()) || (email && t.userEmail?.toLowerCase() === email?.toLowerCase()))
+      .filter(
+        (t) =>
+          (userId &&
+            (t.buyerId?.id || t.buyerId)?.toString() === userId?.toString()) ||
+          (email && t.userEmail?.toLowerCase() === email?.toLowerCase()),
+      )
       .reverse();
   },
 
   async getTicketByCodeOrId(codeOrId) {
     if (isDbConnected()) {
       return await Ticket.findOne({
-        $or: [{ ticketCode: codeOrId.toUpperCase() }, { _id: codeOrId.match(/^[0-9a-fA-F]{24}$/) ? codeOrId : null }]
+        $or: [
+          { ticketCode: codeOrId.toUpperCase() },
+          { _id: codeOrId.match(/^[0-9a-fA-F]{24}$/) ? codeOrId : null },
+        ],
       });
     }
-    const target = String(codeOrId || '').toUpperCase();
-    return memoryStore.tickets.find(t => t.ticketCode?.toUpperCase() === target || (t.id || t._id)?.toString() === codeOrId) || null;
+    const target = String(codeOrId || "").toUpperCase();
+    return (
+      memoryStore.tickets.find(
+        (t) =>
+          t.ticketCode?.toUpperCase() === target ||
+          (t.id || t._id)?.toString() === codeOrId,
+      ) || null
+    );
   },
 
   async listTicketsByReference(reference) {
     if (isDbConnected()) {
       return await Ticket.find({ reference });
     }
-    return memoryStore.tickets.filter(t => t.reference === reference);
+    return memoryStore.tickets.filter((t) => t.reference === reference);
   },
 
   async updateTicket(id, updateData) {
     if (isDbConnected()) {
       return await Ticket.findByIdAndUpdate(id, updateData, { new: true });
     }
-    const index = memoryStore.tickets.findIndex(t => (t.id || t._id)?.toString() === id?.toString());
+    const index = memoryStore.tickets.findIndex(
+      (t) => (t.id || t._id)?.toString() === id?.toString(),
+    );
     if (index !== -1) {
-      memoryStore.tickets[index] = { ...memoryStore.tickets[index], ...updateData };
+      memoryStore.tickets[index] = {
+        ...memoryStore.tickets[index],
+        ...updateData,
+      };
       return memoryStore.tickets[index];
     }
     return null;
@@ -225,7 +319,7 @@ const dataStore = {
       id,
       _id: id,
       ...orderData,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     memoryStore.orders.push(order);
     return order;
@@ -235,16 +329,23 @@ const dataStore = {
     if (isDbConnected()) {
       return await Order.findOne({ reference });
     }
-    return memoryStore.orders.find(o => o.reference === reference) || null;
+    return memoryStore.orders.find((o) => o.reference === reference) || null;
   },
 
   async updateOrder(reference, updateData) {
     if (isDbConnected()) {
-      return await Order.findOneAndUpdate({ reference }, updateData, { new: true });
+      return await Order.findOneAndUpdate({ reference }, updateData, {
+        new: true,
+      });
     }
-    const index = memoryStore.orders.findIndex(o => o.reference === reference);
+    const index = memoryStore.orders.findIndex(
+      (o) => o.reference === reference,
+    );
     if (index !== -1) {
-      memoryStore.orders[index] = { ...memoryStore.orders[index], ...updateData };
+      memoryStore.orders[index] = {
+        ...memoryStore.orders[index],
+        ...updateData,
+      };
       return memoryStore.orders[index];
     }
     return null;
@@ -252,9 +353,15 @@ const dataStore = {
 
   async listOrdersByOwner(ownerId) {
     if (isDbConnected()) {
-      return await Order.find({ ownerId, status: 'success' }).sort({ createdAt: -1 });
+      return await Order.find({ ownerId, status: "success" }).sort({
+        createdAt: -1,
+      });
     }
-    return memoryStore.orders.filter(o => (o.ownerId?.id || o.ownerId)?.toString() === ownerId?.toString() && o.status === 'success');
+    return memoryStore.orders.filter(
+      (o) =>
+        (o.ownerId?.id || o.ownerId)?.toString() === ownerId?.toString() &&
+        o.status === "success",
+    );
   },
 
   // Payment Operations
@@ -268,7 +375,7 @@ const dataStore = {
       id,
       _id: id,
       ...paymentData,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     memoryStore.payments.push(payment);
     return payment;
@@ -278,16 +385,23 @@ const dataStore = {
     if (isDbConnected()) {
       return await Payment.findOne({ reference });
     }
-    return memoryStore.payments.find(p => p.reference === reference) || null;
+    return memoryStore.payments.find((p) => p.reference === reference) || null;
   },
 
   async updatePayment(reference, updateData) {
     if (isDbConnected()) {
-      return await Payment.findOneAndUpdate({ reference }, updateData, { new: true });
+      return await Payment.findOneAndUpdate({ reference }, updateData, {
+        new: true,
+      });
     }
-    const index = memoryStore.payments.findIndex(p => p.reference === reference);
+    const index = memoryStore.payments.findIndex(
+      (p) => p.reference === reference,
+    );
     if (index !== -1) {
-      memoryStore.payments[index] = { ...memoryStore.payments[index], ...updateData };
+      memoryStore.payments[index] = {
+        ...memoryStore.payments[index],
+        ...updateData,
+      };
       return memoryStore.payments[index];
     }
     return null;
@@ -304,7 +418,7 @@ const dataStore = {
       id,
       _id: id,
       ...data,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     memoryStore.withdrawals.unshift(withdrawal);
     return withdrawal;
@@ -314,12 +428,19 @@ const dataStore = {
     if (isDbConnected()) {
       const query = {};
       if (filter.ownerId) query.ownerId = filter.ownerId;
-      if (filter.status && filter.status !== 'all') query.status = filter.status;
+      if (filter.status && filter.status !== "all")
+        query.status = filter.status;
       return await Withdrawal.find(query).sort({ createdAt: -1 });
     }
     let list = [...memoryStore.withdrawals];
-    if (filter.ownerId) list = list.filter(w => (w.ownerId?.id || w.ownerId)?.toString() === filter.ownerId?.toString());
-    if (filter.status && filter.status !== 'all') list = list.filter(w => w.status === filter.status);
+    if (filter.ownerId)
+      list = list.filter(
+        (w) =>
+          (w.ownerId?.id || w.ownerId)?.toString() ===
+          filter.ownerId?.toString(),
+      );
+    if (filter.status && filter.status !== "all")
+      list = list.filter((w) => w.status === filter.status);
     return list;
   },
 
@@ -327,16 +448,25 @@ const dataStore = {
     if (isDbConnected()) {
       return await Withdrawal.findById(id);
     }
-    return memoryStore.withdrawals.find(w => (w.id || w._id)?.toString() === id?.toString()) || null;
+    return (
+      memoryStore.withdrawals.find(
+        (w) => (w.id || w._id)?.toString() === id?.toString(),
+      ) || null
+    );
   },
 
   async updateWithdrawal(id, updateData) {
     if (isDbConnected()) {
       return await Withdrawal.findByIdAndUpdate(id, updateData, { new: true });
     }
-    const index = memoryStore.withdrawals.findIndex(w => (w.id || w._id)?.toString() === id?.toString());
+    const index = memoryStore.withdrawals.findIndex(
+      (w) => (w.id || w._id)?.toString() === id?.toString(),
+    );
     if (index !== -1) {
-      memoryStore.withdrawals[index] = { ...memoryStore.withdrawals[index], ...updateData };
+      memoryStore.withdrawals[index] = {
+        ...memoryStore.withdrawals[index],
+        ...updateData,
+      };
       return memoryStore.withdrawals[index];
     }
     return null;
@@ -347,14 +477,26 @@ const dataStore = {
     if (isDbConnected()) {
       return await Discount.find(ownerId ? { ownerId } : {});
     }
-    return ownerId ? memoryStore.discounts.filter(d => (d.ownerId?.id || d.ownerId)?.toString() === ownerId?.toString()) : memoryStore.discounts;
+    return ownerId
+      ? memoryStore.discounts.filter(
+          (d) =>
+            (d.ownerId?.id || d.ownerId)?.toString() === ownerId?.toString(),
+        )
+      : memoryStore.discounts;
   },
 
   async findDiscountByCode(code) {
     if (isDbConnected()) {
-      return await Discount.findOne({ code: code.toUpperCase(), isActive: true });
+      return await Discount.findOne({
+        code: code.toUpperCase(),
+        isActive: true,
+      });
     }
-    return memoryStore.discounts.find(d => d.code?.toUpperCase() === code.toUpperCase() && d.isActive) || null;
+    return (
+      memoryStore.discounts.find(
+        (d) => d.code?.toUpperCase() === code.toUpperCase() && d.isActive,
+      ) || null
+    );
   },
 
   async createDiscount(discountData) {
@@ -363,7 +505,12 @@ const dataStore = {
       return await discount.save();
     }
     const id = `disc_${Date.now()}`;
-    const discount = { id, _id: id, ...discountData, createdAt: new Date().toISOString() };
+    const discount = {
+      id,
+      _id: id,
+      ...discountData,
+      createdAt: new Date().toISOString(),
+    };
     memoryStore.discounts.push(discount);
     return discount;
   },
@@ -371,11 +518,11 @@ const dataStore = {
   // Blogs & Content
   async listBlogs(category) {
     if (isDbConnected()) {
-      const query = category && category !== 'All' ? { category } : {};
+      const query = category && category !== "All" ? { category } : {};
       return await Blog.find(query).sort({ createdAt: -1 });
     }
-    if (category && category !== 'All') {
-      return memoryStore.blogs.filter(b => b.category === category);
+    if (category && category !== "All") {
+      return memoryStore.blogs.filter((b) => b.category === category);
     }
     return memoryStore.blogs;
   },
@@ -384,7 +531,13 @@ const dataStore = {
     if (isDbConnected()) {
       return await Blog.findOne({ slug: slug.toLowerCase() });
     }
-    return memoryStore.blogs.find(b => b.slug?.toLowerCase() === slug.toLowerCase() || (b.id || b._id)?.toString() === slug) || null;
+    return (
+      memoryStore.blogs.find(
+        (b) =>
+          b.slug?.toLowerCase() === slug.toLowerCase() ||
+          (b.id || b._id)?.toString() === slug,
+      ) || null
+    );
   },
 
   async createBlog(blogData) {
@@ -393,7 +546,12 @@ const dataStore = {
       return await blog.save();
     }
     const id = `blog_${Date.now()}`;
-    const blog = { id, _id: id, ...blogData, createdAt: new Date().toISOString() };
+    const blog = {
+      id,
+      _id: id,
+      ...blogData,
+      createdAt: new Date().toISOString(),
+    };
     memoryStore.blogs.push(blog);
     return blog;
   },
@@ -422,16 +580,26 @@ const dataStore = {
     if (isDbConnected()) {
       return await Newsletter.findOneAndUpdate(
         { email: email.toLowerCase() },
-        { email: email.toLowerCase(), subscribedAt: new Date(), isActive: true },
-        { upsert: true, new: true }
+        {
+          email: email.toLowerCase(),
+          subscribedAt: new Date(),
+          isActive: true,
+        },
+        { upsert: true, new: true },
       );
     }
-    const existing = memoryStore.newsletters.find(n => n.email.toLowerCase() === email.toLowerCase());
+    const existing = memoryStore.newsletters.find(
+      (n) => n.email.toLowerCase() === email.toLowerCase(),
+    );
     if (existing) return existing;
-    const sub = { email: email.toLowerCase(), subscribedAt: new Date().toISOString(), isActive: true };
+    const sub = {
+      email: email.toLowerCase(),
+      subscribedAt: new Date().toISOString(),
+      isActive: true,
+    };
     memoryStore.newsletters.push(sub);
     return sub;
-  }
+  },
 };
 
 module.exports = dataStore;
