@@ -37,6 +37,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
     "qrcode": "^1.5.4",
+    "slugify": "^1.6.9",
     "uuid": "^11.0.5"
   },
   "devDependencies": {

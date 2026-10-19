@@ -1,147 +1,149 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
+const slugify = require("slugify");
 
 const ticketTierSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: true,
-      trim: true
+      trim: true,
     },
     price: {
       type: Number,
       required: true,
-      default: 0
+      default: 0,
     },
     unitAmountKobo: {
       type: Number,
-      default: 0
+      default: 0,
     },
     capacity: {
       type: Number,
       required: true,
-      default: 100
+      default: 100,
     },
     sold: {
       type: Number,
-      default: 0
+      default: 0,
     },
     description: {
       type: String,
-      default: ''
-    }
+      default: "",
+    },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const eventSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, 'Event title is required'],
-      trim: true
+      required: [true, "Event title is required"],
+      trim: true,
     },
     slug: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
-      trim: true
+      trim: true,
     },
     subtitle: {
       type: String,
-      default: ''
+      default: "",
     },
     description: {
       type: String,
-      default: ''
+      default: "",
     },
     category: {
-      type: String,
-      required: true,
-      default: 'Music & Concerts'
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category", // must match the model name you used in mongoose.model('Category', ...)
+      required: [true, "Category is required"],
+      index: true, // you'll likely filter events by category often
     },
     date: {
       type: String, // YYYY-MM-DD
-      required: true
+      required: true,
     },
     time: {
       type: String, // HH:MM
-      default: '18:00'
+      default: "18:00",
     },
     location: {
       type: String,
-      required: true
+      required: true,
     },
     address: {
       type: String,
-      default: ''
+      default: "",
     },
     city: {
       type: String,
-      default: 'Lagos'
+      default: "Lagos",
     },
     country: {
       type: String,
-      default: 'Nigeria'
+      default: "Nigeria",
     },
     currency: {
       type: String,
-      default: 'NGN'
+      default: "NGN",
     },
     price: {
       type: Number,
-      default: 0
+      default: 0,
     },
     minPrice: {
       type: Number,
-      default: 0
+      default: 0,
     },
     maxPrice: {
       type: Number,
-      default: 0
+      default: 0,
     },
     capacity: {
       type: Number,
-      default: 100
+      default: 100,
     },
     soldCount: {
       type: Number,
-      default: 0
+      default: 0,
     },
     image: {
       type: String,
-      default: ''
+      default: "",
     },
     poster: {
       type: String,
-      default: ''
+      default: "",
     },
     status: {
       type: String,
-      enum: ['draft', 'published', 'cancelled', 'completed'],
-      default: 'published'
+      enum: ["draft", "published", "cancelled", "completed"],
+      default: "published",
     },
     completionStatus: {
       type: String,
-      enum: ['upcoming', 'ongoing', 'completed', 'cancelled'],
-      default: 'upcoming'
+      enum: ["upcoming", "ongoing", "completed", "cancelled"],
+      default: "upcoming",
     },
     featured: {
       type: Boolean,
-      default: false
+      default: false,
     },
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+      ref: "User",
+      required: true,
     },
     organizer: {
-      name: { type: String, default: 'Passiq Organizer' },
-      handle: { type: String, default: 'organizer' },
-      email: { type: String, default: '' },
-      phone: { type: String, default: '' },
-      avatar: { type: String, default: '' },
-      verified: { type: Boolean, default: true }
+      name: { type: String, default: "Passiq Organizer" },
+      handle: { type: String, default: "organizer" },
+      email: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      avatar: { type: String, default: "" },
+      verified: { type: Boolean, default: true },
     },
     directions: {
       venueName: String,
@@ -149,9 +151,9 @@ const eventSchema = new mongoose.Schema(
       address: String,
       rating: { type: Number, default: 0 },
       reviewCount: { type: Number, default: 0 },
-      googleMapsUrl: String
+      googleMapsUrl: String,
     },
-    ticketTiers: [ticketTierSchema]
+    ticketTiers: [ticketTierSchema],
   },
   {
     timestamps: true,
@@ -161,10 +163,23 @@ const eventSchema = new mongoose.Schema(
         delete ret._id;
         delete ret.__v;
         return ret;
-      }
-    }
-  }
+      },
+    },
+  },
 );
 
-const Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
+eventSchema.pre("validate", async function () {
+  if (!this.isModified("title") && this.slug) return;
+
+  const base = slugify(this.title, { lower: true, strict: true });
+  let slug = base;
+  let count = 1;
+
+  while (await this.constructor.exists({ slug, _id: { $ne: this._id } })) {
+    slug = `${base}-${count++}`;
+  }
+  this.slug = slug;
+});
+
+const Event = mongoose.models.Event || mongoose.model("Event", eventSchema);
 module.exports = Event;

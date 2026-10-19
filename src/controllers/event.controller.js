@@ -82,10 +82,14 @@ class EventController {
         );
       }
 
-      const slug = `${title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "")}-${Date.now().toString(36)}`;
+      if (!image) {
+        return ApiResponse.error(res, "Event image is required.", 400);
+      }
+
+      // const slug = `${title
+      //   .toLowerCase()
+      //   .replace(/[^a-z0-9]+/g, "-")
+      //   .replace(/(^-|-$)/g, "")}-${Date.now().toString(36)}`;
       const numericPrice = Number(price) || 0;
       const numericCapacity = Number(capacity) || 100;
 
@@ -93,7 +97,6 @@ class EventController {
       const defaultTiers =
         Array.isArray(ticketTiers) && ticketTiers.length > 0
           ? ticketTiers.map((t, idx) => ({
-              id: t.id || `tier_${idx + 1}`,
               name: t.name || "General Admission",
               price: Number(t.price) || 0,
               unitAmountKobo: toKobo(t.price || 0),
@@ -103,7 +106,6 @@ class EventController {
             }))
           : [
               {
-                id: `${slug}-general`,
                 name: "General Admission",
                 price: numericPrice,
                 unitAmountKobo: toKobo(numericPrice),
@@ -115,7 +117,7 @@ class EventController {
 
       const newEvent = await dataStore.createEvent({
         title: title.trim(),
-        slug,
+        slug: title.trim(),
         subtitle,
         description,
         category,
@@ -149,7 +151,7 @@ class EventController {
           shortCode: "GATE-A",
           address: location.trim(),
           rating: 4.8,
-          reviewCount: 24,
+          reviewCount: 0,
           googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}`,
         },
         ticketTiers: defaultTiers,
