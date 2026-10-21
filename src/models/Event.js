@@ -30,6 +30,10 @@ const ticketTierSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    image: {
+      type: String,
+      default: "",
+    },
   },
   { _id: true },
 );

@@ -1,7 +1,7 @@
-const dataStore = require('../models/dataStore');
-const QrService = require('./qr.service');
-const { generateTicketCode } = require('../utils/formatters');
-const logger = require('../utils/logger');
+const dataStore = require("../models/dataStore");
+const QrService = require("./qr.service");
+const { generateTicketCode } = require("../utils/formatters");
+const logger = require("../utils/logger");
 
 class TicketService {
   /**
@@ -9,10 +9,12 @@ class TicketService {
    */
   static async issueTicketsForOrder(order) {
     const event = await dataStore.getEventByIdOrSlug(order.eventId);
-    if (!event) throw new Error('Associated event not found');
+    if (!event) throw new Error("Associated event not found");
 
-    const tier = (event.ticketTiers || []).find(t => (t.id || t._id)?.toString() === order.tierId?.toString());
-    const tierName = tier ? tier.name : 'General Admission';
+    const tier = (event.ticketTiers || []).find(
+      (t) => (t.id || t._id)?.toString() === order.tierId?.toString(),
+    );
+    const tierName = tier ? tier.name : "Regular";
 
     const issuedTickets = [];
 
@@ -32,19 +34,23 @@ class TicketService {
         tierId: order.tierId,
         eventTitle: event.title,
         eventDate: event.date,
-        eventTime: event.time || '18:00',
+        eventTime: event.time || "18:00",
         eventLocation: event.location,
-        eventImage: event.image || event.poster || '',
+        eventImage: event.image || event.poster || "",
         tierName,
         userName: order.attendeeName,
         userEmail: order.email,
-        userPhone: order.phone || '',
-        unitPrice: order.unitAmountKobo ? order.unitAmountKobo / 100 : (order.amount || 0) / order.quantity,
-        totalAmount: order.unitAmountKobo ? order.unitAmountKobo / 100 : (order.amount || 0) / order.quantity,
-        currency: order.currency || 'NGN',
-        status: 'valid',
+        userPhone: order.phone || "",
+        unitPrice: order.unitAmountKobo
+          ? order.unitAmountKobo / 100
+          : (order.amount || 0) / order.quantity,
+        totalAmount: order.unitAmountKobo
+          ? order.unitAmountKobo / 100
+          : (order.amount || 0) / order.quantity,
+        currency: order.currency || "NGN",
+        status: "valid",
         isDemo: false,
-        issuedAt: new Date()
+        issuedAt: new Date(),
       });
 
       issuedTickets.push(ticket);
@@ -56,7 +62,7 @@ class TicketService {
       event.soldCount = (event.soldCount || 0) + order.quantity;
       await dataStore.updateEvent(event.id || event._id, {
         ticketTiers: event.ticketTiers,
-        soldCount: event.soldCount
+        soldCount: event.soldCount,
       });
     }
 
@@ -80,10 +86,13 @@ class TicketService {
   /**
    * Gate Scanner Check-in Verification
    */
-  static async checkInTicket(ticketCodeOrQrToken, scannerStaff = 'Gate Staff') {
+  static async checkInTicket(ticketCodeOrQrToken, scannerStaff = "Gate Staff") {
     let cleanCode = ticketCodeOrQrToken.trim();
-    if (cleanCode.startsWith('PASSIQ-LIVE:') || cleanCode.startsWith('PASSIQ-DEMO:')) {
-      const parts = cleanCode.split(':');
+    if (
+      cleanCode.startsWith("PASSIQ-LIVE:") ||
+      cleanCode.startsWith("PASSIQ-DEMO:")
+    ) {
+      const parts = cleanCode.split(":");
       cleanCode = parts[1] || parts[0];
     }
 
@@ -91,41 +100,41 @@ class TicketService {
     if (!ticket) {
       return {
         success: false,
-        status: 'invalid',
-        message: 'Invalid ticket pass. No matching ticket found.'
+        status: "invalid",
+        message: "Invalid ticket pass. No matching ticket found.",
       };
     }
 
-    if (ticket.status === 'used') {
+    if (ticket.status === "used") {
       return {
         success: false,
-        status: 'already_used',
+        status: "already_used",
         message: `Ticket already checked in at ${new Date(ticket.checkedInAt).toLocaleTimeString()}.`,
-        ticket
+        ticket,
       };
     }
 
-    if (ticket.status === 'revoked') {
+    if (ticket.status === "revoked") {
       return {
         success: false,
-        status: 'revoked',
-        message: 'This ticket pass has been revoked or refunded.',
-        ticket
+        status: "revoked",
+        message: "This ticket pass has been revoked or refunded.",
+        ticket,
       };
     }
 
     // Mark as checked in
     const updated = await dataStore.updateTicket(ticket.id || ticket._id, {
-      status: 'used',
+      status: "used",
       checkedInAt: new Date(),
-      checkedInBy: scannerStaff
+      checkedInBy: scannerStaff,
     });
 
     return {
       success: true,
-      status: 'checked_in',
+      status: "checked_in",
       message: `Welcome, ${ticket.userName}! Ticket successfully validated.`,
-      ticket: updated || ticket
+      ticket: updated || ticket,
     };
   }
 }

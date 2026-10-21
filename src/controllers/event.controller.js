@@ -58,21 +58,25 @@ class EventController {
     try {
       const {
         title,
-        category = "Music & Concerts",
+        category,
         date,
-        time = "18:00",
+        time,
         location,
-        city = "Lagos",
-        country = "Nigeria",
+        city,
+        country,
         price = 0,
-        capacity = 100,
-        status = "published",
-        description = "",
-        subtitle = "",
-        image = "",
-        poster = "",
+        capacity,
+        status,
+        description,
+        subtitle,
+        image,
+        poster,
         ticketTiers,
       } = req.body;
+
+      if (!category) {
+        return ApiResponse.error(res, "category id is required", 400);
+      }
 
       if (!title || !date || !location) {
         return ApiResponse.error(
@@ -97,21 +101,23 @@ class EventController {
       const defaultTiers =
         Array.isArray(ticketTiers) && ticketTiers.length > 0
           ? ticketTiers.map((t, idx) => ({
-              name: t.name || "General Admission",
+              name: t.name || "Regular",
               price: Number(t.price) || 0,
               unitAmountKobo: toKobo(t.price || 0),
               capacity: Number(t.capacity) || numericCapacity,
               sold: 0,
-              description: t.description || "Standard access ticket pass.",
+              description: t.description || "Regular access ticket pass.",
+              image: t.image || image,
             }))
           : [
               {
-                name: "General Admission",
+                name: "Regular",
                 price: numericPrice,
                 unitAmountKobo: toKobo(numericPrice),
                 capacity: numericCapacity,
                 sold: 0,
-                description: "Standard access ticket pass.",
+                description: "Regular access ticket pass.",
+                image: image,
               },
             ];
 
