@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Resend } = require('resend');
 const fs = require('fs');
 const path = require('path');
@@ -5,7 +6,7 @@ const logger = require('../utils/logger');
 const { formatCurrency } = require('../utils/formatters');
 const QrService = require('./qr.service');
 
-  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 if (!RESEND_API_KEY) {
   throw new Error('RESEND_API_KEY is not set. Add it to your .env or hosting environment variables.');
@@ -15,6 +16,27 @@ const ADMIN_NOTIFICATION_EMAIL =
 const RESEND_FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL || 'Passiq Events <onboarding@resend.dev>';
 const RESEND_ACCOUNT_DEV_EMAIL = 'darkseid692@gmail.com';
+const nodemailer = require('nodemailer');
+
+// ============================================================================
+// 👉 PASTE YOUR CLOUDINARY TICKET/EVENT BANNER URL HERE (Line 24):
+// Example: "https://res.cloudinary.com/your-cloud/image/upload/v12345/banner.png"
+// (Leave as empty string "" if you want it to use the event/tier picture automatically)
+// ============================================================================
+const CUSTOM_CLOUDINARY_IMAGE_URL = process.env.CLOUDINARY_TICKET_IMAGE_URL || "https://res.cloudinary.com/dxrk4tydc/image/upload/v1792584411/marlian-fest-poster2.png";
+
+function createSmtpTransporter() {
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+  if (!user || !pass) return null;
+  return nodemailer.createTransporter ? nodemailer.createTransporter({
+    service: 'gmail',
+    auth: { user, pass },
+  }) : nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  });
+}
 
 const resend = new Resend(RESEND_API_KEY);
 
@@ -61,6 +83,30 @@ class EmailService {
         error.message?.includes('validation_error') ||
         error.message?.includes('verify a domain')
       ) {
+        const transporter = createSmtpTransporter();
+        if (transporter) {
+          try {
+            logger.info(`[EmailService] Sending directly to ${to} via Gmail SMTP fallback...`);
+            const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+            const mailRes = await transporter.sendMail({
+              from: `Passiq Events <${smtpUser}>`,
+              to,
+              replyTo,
+              subject,
+              html,
+              attachments: attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                cid: a.cid,
+              })),
+            });
+            logger.info(`[EmailService] Successfully delivered directly to ${to} via Gmail SMTP!`);
+            return { success: true, data: mailRes, smtpFallback: true };
+          } catch (smtpErr) {
+            logger.warn(`[EmailService] Gmail SMTP fallback failed: ${smtpErr.message}`);
+          }
+        }
+
         logger.info(
           `[EmailService] Resend unverified domain restriction active. Rerouting sandbox copy to verified address (${RESEND_ACCOUNT_DEV_EMAIL}). To deliver directly to ${to}, verify your domain at resend.com/domains.`
         );
@@ -272,7 +318,13 @@ class EmailService {
       const ticketCount = tickets.length || order.quantity || 1;
 
       // Resolve Cloudinary or public picture for the purchased tier / pass
-      const rawTierImage = tier?.image || event?.image || event?.poster || '';
+      // Prioritizes CUSTOM_CLOUDINARY_IMAGE_URL if pasted at the top of this file
+      const rawTierImage =
+        CUSTOM_CLOUDINARY_IMAGE_URL ||
+        tier?.image ||
+        event?.image ||
+        event?.poster ||
+        '';
       const tierCloudinaryUrl = resolveImageUrl(rawTierImage);
 
       const attachments = [];
