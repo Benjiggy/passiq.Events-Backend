@@ -17,21 +17,25 @@ class TicketService {
       (t) => (t.id || t._id)?.toString() === order.tierId?.toString(),
     );
     const tierName = tier ? tier.name : "Regular";
+    const frontendBase = (process.env.FRONTEND_URL || "https://passiq.events").replace(/\/+$/, "");
 
     const issuedTickets = [];
 
     for (let i = 0; i < order.quantity; i++) {
       const ticketCode = generateTicketCode(event.slug || event.id, i + 1);
-      // Generate a cryptographically random token for every ticket QR code
-      const randomNonce = crypto.randomBytes(6).toString("hex").toUpperCase();
-      const qrToken = `PASSIQ-LIVE:${ticketCode}:${order.reference}:${randomNonce}`;
-      const qrDataUrl = await QrService.generateQrCodeDataUrl(qrToken);
+
+      // Scannable URL that opens the verified ticket pass directly when scanned with phone camera
+      const qrScanUrl = `${frontendBase}/payment/callback?reference=${encodeURIComponent(order.reference)}&ticket=${encodeURIComponent(ticketCode)}`;
+      const qrDataUrl = await QrService.generateQrCodeDataUrl(qrScanUrl);
+
+      // Save a permanent QR code PNG image to disk
+      await QrService.saveQrCodeToDisk(qrScanUrl, `qr_${ticketCode}.png`);
 
       const ticket = await dataStore.createTicket({
         ticketCode,
         reference: order.reference,
         paymentReference: order.reference,
-        qrToken,
+        qrToken: qrScanUrl,
         qrDataUrl,
         buyerId: order.buyerId || null,
         eventId: event.id || event._id,
@@ -71,7 +75,7 @@ class TicketService {
       });
     }
 
-    // Dispatch email notification with tickets, random QR codes, numbers and amount
+    // Dispatch email notification with tickets, QR codes, numbers and amount
     try {
       await EmailService.sendTicketPurchaseConfirmation({
         order,
@@ -108,16 +112,30 @@ class TicketService {
 
   /**
    * Gate Scanner Check-in Verification
+   * Accepts Phone Camera Scans, Web URLs, Tokens, or Direct Ticket Numbers
    */
   static async checkInTicket(ticketCodeOrQrToken, scannerStaff = "Gate Staff") {
-    let cleanCode = ticketCodeOrQrToken.trim();
-    if (
+    let cleanCode = String(ticketCodeOrQrToken || "").trim();
+
+    // 1. If scanned from URL (e.g. https://passiq.events/payment/callback?reference=...&ticket=MARL-1234)
+    if (cleanCode.includes("ticket=")) {
+      const match = cleanCode.match(/[?&]ticket=([A-Za-z0-9_-]+)/i);
+      if (match) cleanCode = match[1];
+    } else if (cleanCode.includes("code=")) {
+      const match = cleanCode.match(/[?&]code=([A-Za-z0-9_-]+)/i);
+      if (match) cleanCode = match[1];
+    } else if (cleanCode.includes("/tickets/")) {
+      const afterTickets = cleanCode.split("/tickets/")[1];
+      if (afterTickets) cleanCode = afterTickets.split(/[?#&/]/)[0];
+    } else if (
       cleanCode.startsWith("PASSIQ-LIVE:") ||
       cleanCode.startsWith("PASSIQ-DEMO:")
     ) {
       const parts = cleanCode.split(":");
       cleanCode = parts[1] || parts[0];
     }
+
+    cleanCode = cleanCode.trim().toUpperCase();
 
     const ticket = await dataStore.getTicketByCodeOrId(cleanCode);
     if (!ticket) {

@@ -329,16 +329,17 @@ class EmailService {
 
       const attachments = [];
 
-      // Generate individual QR code buffers for every ticket purchased
+      // Generate individual QR code buffers & public image URLs for every ticket purchased
       const ticketsWithCid = [];
       for (let i = 0; i < tickets.length; i++) {
         const tkt = tickets[i];
         const qrBuffer = await QrService.generateQrCodeBuffer(tkt.qrToken);
         const cid = `qr-${tkt.ticketCode}`;
+        const qrImageUrl = QrService.getPublicQrImageUrl(tkt.qrToken, 320);
 
         if (qrBuffer) {
           attachments.push({
-            filename: `ticket-${tkt.ticketCode}.png`,
+            filename: `Passiq-Ticket-${tkt.ticketCode}-QR.png`,
             content: qrBuffer,
             cid: cid,
           });
@@ -347,6 +348,7 @@ class EmailService {
         ticketsWithCid.push({
           ...tkt,
           cid,
+          qrImageUrl,
           formattedPrice: formatCurrency(tkt.unitPrice || (order.amount / ticketCount), currency),
         });
       }
@@ -383,9 +385,15 @@ class EmailService {
                 : ''
             }
 
-            <!-- Scannable Gate QR Code -->
-            <div style="background:#ffffff;padding:14px;border-radius:16px;display:inline-block;margin:10px auto;box-shadow:0 4px 16px rgba(0,0,0,0.25);">
-              <img src="cid:${t.cid}" alt="Gate QR Code for Ticket ${t.ticketCode}" width="190" height="190" style="display:block;margin:0 auto;" />
+            <!-- Scannable Gate QR Code (Loads 100% reliably in Gmail, Outlook, Apple Mail) -->
+            <div style="background:#ffffff;padding:14px;border-radius:18px;display:inline-block;margin:12px auto;box-shadow:0 6px 20px rgba(0,0,0,0.3);text-align:center;">
+              <img src="${t.qrImageUrl}" alt="Gate QR Code for Ticket ${t.ticketCode}" width="200" height="200" style="display:block;margin:0 auto;border:none;" />
+            </div>
+
+            <div style="margin-top:6px;">
+              <a href="${t.qrToken}" target="_blank" style="display:inline-block;font-size:11px;color:#ccff00;text-decoration:none;font-weight:700;padding:5px 12px;background:#1a2332;border-radius:6px;border:1px solid #2d3b4e;">
+                📱 View Live Ticket Pass ↗
+              </a>
             </div>
 
             <!-- Ticket Identification Number -->
