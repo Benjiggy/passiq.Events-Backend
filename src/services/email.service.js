@@ -5,29 +5,42 @@ const logger = require('../utils/logger');
 const { formatCurrency } = require('../utils/formatters');
 const QrService = require('./qr.service');
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 if (!RESEND_API_KEY) {
-  throw new Error('RESEND_API_KEY is not set in environment variables');
+  throw new Error('RESEND_API_KEY is not set. Add it to your .env or hosting environment variables.');
 }
-
 const ADMIN_NOTIFICATION_EMAIL =
   process.env.ADMIN_NOTIFICATION_EMAIL || 'Passiq.events@gmail.com';
 const RESEND_FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL || 'Passiq Events <onboarding@resend.dev>';
 const RESEND_ACCOUNT_DEV_EMAIL = 'darkseid692@gmail.com';
+
 const resend = new Resend(RESEND_API_KEY);
+
+/**
+ * Resolve relative or Cloudinary image paths to full public URLs
+ */
+function resolveImageUrl(imagePath) {
+  if (!imagePath) return '';
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  const baseUrl = (process.env.FRONTEND_URL || 'https://passiq.events').replace(/\/+$/, '');
+  return `${baseUrl}/${imagePath.replace(/^\/+/, '')}`;
+}
 
 class EmailService {
   /**
    * Safe email sender with Resend sandbox/testing fallback
    */
-  static async sendEmailSafe({ from, to, subject, html, attachments = [] }) {
+  static async sendEmailSafe({ from, to, subject, html, attachments = [], replyTo = 'Passiq.events@gmail.com' }) {
     const fromAddress = from || RESEND_FROM_EMAIL;
     try {
       const response = await resend.emails.send({
         from: fromAddress,
         to,
+        replyTo,
         subject,
         html,
         attachments,
@@ -54,9 +67,9 @@ class EmailService {
 
         const sandboxNotice = `
           <div style="background:#fff3cd;color:#856404;padding:12px 16px;border-radius:8px;margin-bottom:20px;font-family:sans-serif;font-size:13px;border:1px solid #ffeeba;">
-            <strong>⚠️ Resend Sandbox Notice:</strong> This email was intended for <strong>${to}</strong>.<br/>
+            <strong>⚠️ Resend Sandbox Notice:</strong> This receipt & ticket pass was intended for <strong>${to}</strong>.<br/>
             Because this Resend account is currently in sandbox testing mode, it was forwarded to the account owner (<strong>${RESEND_ACCOUNT_DEV_EMAIL}</strong>).<br/>
-            <em>To deliver directly to ${to} and attendee emails, please verify your custom domain (e.g. passiq.events) at <a href="https://resend.com/domains" target="_blank" style="color:#0056b3;">resend.com/domains</a> and set RESEND_FROM_EMAIL in .env.</em>
+            <em>To deliver directly to ${to} and all attendee emails, please verify your custom domain (e.g. passiq.events) at <a href="https://resend.com/domains" target="_blank" style="color:#0056b3;">resend.com/domains</a> and set RESEND_FROM_EMAIL in .env.</em>
           </div>
         `;
 
@@ -64,6 +77,7 @@ class EmailService {
           const fallbackRes = await resend.emails.send({
             from: fromAddress,
             to: RESEND_ACCOUNT_DEV_EMAIL,
+            replyTo,
             subject: `[FORWARDED TO DEV - FOR ${to}] ${subject}`,
             html: sandboxNotice + html,
             attachments,
@@ -105,8 +119,6 @@ class EmailService {
       });
 
       const attachments = [];
-
-      // Attach proof file if available
       let hasImageAttachment = false;
       let proofCid = 'proof-of-payment';
 
@@ -160,7 +172,7 @@ class EmailService {
               <p>Action Required: Review bank receipt and confirm ticket order</p>
             </div>
             <div class="content">
-              <span class="badge">PROVIdUS BANK TRANSFER</span>
+              <span class="badge">PROVIDUS BANK TRANSFER</span>
               
               <div class="amount-box">
                 <div class="label">Total Amount Paid</div>
@@ -243,7 +255,7 @@ class EmailService {
   }
 
   /**
-   * Send Ticket Confirmation with Random QR Codes and ticket amounts to the attendee
+   * Send Official Ticket Receipt & Admission Passes with QR Codes & Cloudinary Tier Artwork
    * Triggered upon confirmed payment (Paystack or Bank Transfer verification)
    */
   static async sendTicketPurchaseConfirmation({
@@ -257,10 +269,15 @@ class EmailService {
       const currency = order.currency || event?.currency || 'NGN';
       const formattedTotal = formatCurrency(order.amount, currency);
       const tierName = tier?.name || order.tierId || 'Regular Pass';
+      const ticketCount = tickets.length || order.quantity || 1;
+
+      // Resolve Cloudinary or public picture for the purchased tier / pass
+      const rawTierImage = tier?.image || event?.image || event?.poster || '';
+      const tierCloudinaryUrl = resolveImageUrl(rawTierImage);
 
       const attachments = [];
 
-      // Generate QR buffers for every ticket and prepare inline CID attachments
+      // Generate individual QR code buffers for every ticket purchased
       const ticketsWithCid = [];
       for (let i = 0; i < tickets.length; i++) {
         const tkt = tickets[i];
@@ -278,35 +295,64 @@ class EmailService {
         ticketsWithCid.push({
           ...tkt,
           cid,
-          formattedPrice: formatCurrency(tkt.unitPrice || (order.amount / order.quantity), currency),
+          formattedPrice: formatCurrency(tkt.unitPrice || (order.amount / ticketCount), currency),
         });
       }
 
-      // Build Ticket Pass cards HTML
+      const paymentDate = new Date().toLocaleDateString('en-NG', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      // Build each purchased ticket card (1, 2, 3 or more tickets)
       const ticketCardsHtml = ticketsWithCid
         .map(
           (t, index) => `
-          <div style="background:#181d24;border:1px solid #2d3644;border-radius:18px;padding:24px;margin-bottom:20px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #262e3b;padding-bottom:10px;">
-              <span style="font-size:11px;font-weight:700;color:#ccff00;text-transform:uppercase;letter-spacing:1px;">Ticket ${index + 1} of ${tickets.length}</span>
-              <span style="font-size:11px;font-weight:600;color:#94a3b8;">${t.tierName || tierName}</span>
+          <div style="background:#141921;border:1.5px solid #2d3748;border-radius:20px;padding:24px;margin-bottom:24px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.4);position:relative;overflow:hidden;">
+            <!-- Top Pass Bar -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px dashed #2d3748;padding-bottom:12px;">
+              <span style="font-size:11px;font-weight:800;color:#ccff00;text-transform:uppercase;letter-spacing:1.5px;background:rgba(204,255,0,0.12);padding:4px 10px;border-radius:6px;">
+                🎟️ Ticket Pass ${index + 1} of ${ticketCount}
+              </span>
+              <span style="font-size:12px;font-weight:700;color:#f1f5f9;letter-spacing:0.5px;">
+                ${t.tierName || tierName}
+              </span>
             </div>
 
-            <div style="background:#ffffff;padding:12px;border-radius:14px;display:inline-block;margin:10px 0;">
-              <img src="cid:${t.cid}" alt="QR Code for Ticket ${t.ticketCode}" width="180" height="180" style="display:block;margin:0 auto;" />
+            <!-- Cloudinary Tier Picture on each pass (if available) -->
+            ${
+              tierCloudinaryUrl
+                ? `
+              <div style="margin-bottom:16px;">
+                <img src="${tierCloudinaryUrl}" alt="${t.tierName || tierName} Pass" style="width:100%;max-width:480px;height:auto;max-height:160px;object-fit:cover;border-radius:12px;border:1px solid #2d3748;display:block;margin:0 auto;" />
+              </div>
+            `
+                : ''
+            }
+
+            <!-- Scannable Gate QR Code -->
+            <div style="background:#ffffff;padding:14px;border-radius:16px;display:inline-block;margin:10px auto;box-shadow:0 4px 16px rgba(0,0,0,0.25);">
+              <img src="cid:${t.cid}" alt="Gate QR Code for Ticket ${t.ticketCode}" width="190" height="190" style="display:block;margin:0 auto;" />
             </div>
 
-            <div style="margin-top:12px;">
-              <div style="font-size:12px;color:#94a3b8;margin-bottom:2px;">Ticket Number</div>
-              <div style="font-family:monospace;font-size:17px;font-weight:900;color:#ccff00;letter-spacing:2px;">${t.ticketCode}</div>
+            <!-- Ticket Identification Number -->
+            <div style="margin-top:14px;">
+              <div style="font-size:11px;text-transform:uppercase;color:#94a3b8;letter-spacing:1px;font-weight:600;margin-bottom:4px;">Official Ticket Number</div>
+              <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:19px;font-weight:900;color:#ccff00;letter-spacing:2.5px;background:#0d1117;display:inline-block;padding:6px 16px;border-radius:8px;border:1px solid #232b36;">
+                ${t.ticketCode}
+              </div>
             </div>
 
-            <div style="margin-top:10px;font-size:12px;color:#cbd5e1;">
-              Admission Price: <strong style="color:#ffffff;">${t.formattedPrice}</strong>
+            <!-- Ticket Price & Admission Status -->
+            <div style="margin-top:14px;display:flex;justify-content:space-around;font-size:12px;color:#cbd5e1;padding-top:12px;border-top:1px dashed #232b36;">
+              <div>Tier: <strong style="color:#ffffff;">${t.tierName || tierName}</strong></div>
+              <div>Price: <strong style="color:#ffffff;">${t.formattedPrice}</strong></div>
+              <div>Status: <strong style="color:#4ade80;">Active Pass</strong></div>
             </div>
 
-            <div style="margin-top:10px;font-size:11px;color:#64748b;border-top:1px dashed #283241;padding-top:10px;">
-              🔒 Unique Gate QR Pass • Valid for 1 single admission scan
+            <div style="margin-top:12px;font-size:11px;color:#64748b;">
+              🔒 Valid for 1 single admission scan at the entrance gate
             </div>
           </div>
         `
@@ -318,63 +364,140 @@ class EmailService {
         <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Your Passiq Events Receipt & Ticket Pass</title>
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0d10; color: #f1f5f9; margin: 0; padding: 24px; }
-            .container { max-width: 620px; margin: 0 auto; background: #13171d; border-radius: 20px; border: 1px solid #232933; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-            .header { background: #181d24; padding: 28px 32px; border-bottom: 1px solid #232933; text-align: center; }
-            .header h1 { margin: 0; font-size: 22px; color: #ccff00; letter-spacing: -0.5px; }
-            .header p { margin: 6px 0 0; color: #94a3b8; font-size: 14px; }
-            .content { padding: 32px; }
-            .event-card { background: #181d24; border: 1px solid #283241; border-radius: 16px; padding: 20px; margin-bottom: 24px; }
-            .event-title { font-size: 18px; font-weight: 800; color: #ffffff; margin: 0 0 10px; }
-            .event-detail { font-size: 13px; color: #94a3b8; margin: 4px 0; }
-            .event-detail strong { color: #ffffff; }
-            .summary-box { background: rgba(204,255,0,0.06); border: 1px solid rgba(204,255,0,0.2); border-radius: 14px; padding: 18px; margin-bottom: 28px; }
-            .summary-row { display: flex; justify-content: space-between; font-size: 13px; margin: 6px 0; }
-            .summary-row.total { border-top: 1px solid rgba(204,255,0,0.2); padding-top: 10px; margin-top: 10px; font-size: 15px; font-weight: 800; color: #ccff00; }
-            .footer { background: #0e1115; padding: 24px 32px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #1e242c; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0d10; color: #f1f5f9; margin: 0; padding: 20px 10px; }
+            .container { max-width: 600px; margin: 0 auto; background: #11151c; border-radius: 24px; border: 1px solid #232b38; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.6); }
+            .brand-header { background: #161c24; padding: 24px 30px; text-align: center; border-bottom: 1px solid #242c38; }
+            .brand-logo { font-size: 24px; font-weight: 900; color: #ccff00; letter-spacing: -0.5px; margin: 0; }
+            .brand-subtitle { font-size: 12px; color: #94a3b8; margin: 4px 0 0; text-transform: uppercase; letter-spacing: 1.5px; }
+            
+            /* Paystack Receipt Highlight Box */
+            .receipt-banner { background: #1a222e; border: 1px solid #2d3848; border-radius: 18px; padding: 24px; margin: 24px; text-align: center; }
+            .merchant-title { font-size: 13px; font-weight: 800; color: #cbd5e1; text-transform: uppercase; letter-spacing: 1.5px; }
+            .receipt-note { font-size: 13px; color: #94a3b8; margin: 6px 0 10px; }
+            .total-amount { font-size: 36px; font-weight: 900; color: #ccff00; letter-spacing: -1px; margin: 8px 0; }
+            .verified-badge { display: inline-block; background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+
+            .content { padding: 0 24px 24px; }
+            
+            /* Cloudinary Tier Banner Feature */
+            .tier-banner-box { margin-bottom: 24px; border-radius: 18px; overflow: hidden; border: 1px solid #2d3848; background: #161c24; }
+            .tier-banner-img { width: 100%; height: auto; max-height: 240px; object-fit: cover; display: block; }
+            .tier-banner-caption { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background: #161c24; font-size: 13px; }
+
+            /* Transaction Details Table */
+            .details-card { background: #161c24; border-radius: 16px; border: 1px solid #262e3b; padding: 18px 20px; margin-bottom: 28px; }
+            .card-title { font-size: 12px; font-weight: 800; color: #ccff00; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 14px; border-bottom: 1px solid #232b38; padding-bottom: 8px; }
+            .detail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 7px 0; border-bottom: 1px solid #1c232d; }
+            .detail-row:last-child { border-bottom: none; }
+            .detail-label { color: #94a3b8; font-weight: 500; }
+            .detail-value { color: #ffffff; font-weight: 700; text-align: right; }
+
+            /* Pass Header */
+            .passes-heading { text-align: center; margin: 28px 0 16px; }
+            .passes-heading h2 { font-size: 18px; font-weight: 900; color: #ffffff; margin: 0; }
+            .passes-heading p { font-size: 12px; color: #94a3b8; margin: 4px 0 0; }
+
+            .gate-notice { background: rgba(204,255,0,0.06); border: 1px solid rgba(204,255,0,0.2); border-radius: 14px; padding: 16px; font-size: 12px; color: #cbd5e1; text-align: center; margin-top: 20px; }
+            .footer { background: #0c0f14; padding: 24px 30px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #1c232d; }
+            .footer a { color: #ccff00; text-decoration: none; font-weight: 600; }
           </style>
         </head>
         <body>
           <div class="container">
-            <div class="header">
-              <h1>You're In! Here Are Your Event Tickets</h1>
-              <p>Confirmed Passiq Ticket Purchase — Present QR Codes at the gate</p>
+            <!-- Brand Header -->
+            <div class="brand-header">
+              <div class="brand-logo">Passiq.Events</div>
+              <div class="brand-subtitle">Official Ticket Receipt & Admission Pass</div>
             </div>
-            
-            <div class="content">
-              <!-- Event Information -->
-              <div class="event-card">
-                <div class="event-title">${event?.title || 'Event Admission'}</div>
-                <div class="event-detail">📅 Date: <strong>${event?.date || 'As announced'}</strong></div>
-                <div class="event-detail">⏰ Time: <strong>${event?.time || 'Doors open 18:00'}</strong></div>
-                <div class="event-detail">📍 Venue: <strong>${event?.location || 'Venue announced on pass'}</strong></div>
-              </div>
 
-              <!-- Order Summary -->
-              <div class="summary-box">
-                <div style="font-size:11px;font-weight:700;color:#ccff00;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Order Details</div>
-                <div style="font-size:13px;color:#94a3b8;margin-bottom:4px;">Attendee: <strong style="color:#ffffff;">${order.attendeeName}</strong></div>
-                <div style="font-size:13px;color:#94a3b8;margin-bottom:4px;">Order Reference: <strong style="color:#ccff00;font-family:monospace;">${order.reference}</strong></div>
-                <div style="font-size:13px;color:#94a3b8;margin-bottom:4px;">Number of Tickets: <strong style="color:#ffffff;">${order.quantity} ticket${order.quantity > 1 ? 's' : ''} (${tierName})</strong></div>
-                <div style="font-size:15px;font-weight:800;color:#ccff00;margin-top:10px;border-top:1px solid rgba(204,255,0,0.2);padding-top:8px;">
-                  Total Amount Paid: ${formattedTotal}
+            <!-- Receipt from PASSIQ GLOBAL VENTURES LTD (Matching Paystack receipt in your screenshot) -->
+            <div class="receipt-banner">
+              <div class="merchant-title">PASSIQ GLOBAL VENTURES LTD</div>
+              <div class="receipt-note">received your payment of</div>
+              <div class="total-amount">${formattedTotal}</div>
+              <div class="verified-badge">✓ Paid via Paystack • Confirmed</div>
+            </div>
+
+            <div class="content">
+              <!-- Cloudinary Purchased Tier Banner (if available) -->
+              ${
+                tierCloudinaryUrl
+                  ? `
+                <div class="tier-banner-box">
+                  <img src="${tierCloudinaryUrl}" alt="${tierName} Pass Artwork" class="tier-banner-img" />
+                  <div class="tier-banner-caption">
+                    <span style="color:#ffffff;font-weight:700;">${tierName}</span>
+                    <span style="color:#ccff00;font-weight:800;">${ticketCount} Ticket${ticketCount > 1 ? 's' : ''} Issued</span>
+                  </div>
+                </div>
+              `
+                  : ''
+              }
+
+              <!-- Transaction & Event Details Card -->
+              <div class="details-card">
+                <div class="card-title">Transaction & Event Details</div>
+                
+                <div class="detail-row">
+                  <span class="detail-label">Event</span>
+                  <span class="detail-value">${event?.title || 'Event Registration'}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Reference</span>
+                  <span class="detail-value" style="font-family:monospace;color:#ccff00;">${order.reference}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Payment Date</span>
+                  <span class="detail-value">${paymentDate}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Attendee Name</span>
+                  <span class="detail-value">${order.attendeeName}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Purchased Pass Tier</span>
+                  <span class="detail-value">${tierName}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Quantity</span>
+                  <span class="detail-value">${ticketCount} Ticket${ticketCount > 1 ? 's' : ''}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Event Date & Time</span>
+                  <span class="detail-value">${event?.date || 'As announced'} at ${event?.time || '18:00'}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Venue</span>
+                  <span class="detail-value">${event?.location || 'Venue on pass'}</span>
                 </div>
               </div>
 
-              <h2 style="font-size:16px;font-weight:800;color:#ffffff;margin:24px 0 16px;text-align:center;">Your Admission Passes & QR Codes</h2>
-              
-              <!-- Ticket Passes -->
+              <!-- Passes Heading -->
+              <div class="passes-heading">
+                <h2>Your Admission Passes & Gate QR Codes</h2>
+                <p>Present the QR code(s) below at the gate scanner for admission</p>
+              </div>
+
+              <!-- Individual Ticket Pass Cards (1, 2, 3 or more tickets) -->
               ${ticketCardsHtml}
 
-              <div style="background:#131a24;border:1px solid #1e2c3d;border-radius:12px;padding:14px;text-align:center;font-size:12px;color:#94a3b8;margin-top:20px;">
-                💡 <strong>Gate Tip:</strong> You can show this email directly on your phone at the gate, or save the attached QR code image(s) to your photo library for quick check-in.
+              <!-- Gate Tips -->
+              <div class="gate-notice">
+                💡 <strong>Gate Scanner Tip:</strong> You can open this email directly on your phone at the entrance, or save the attached QR code image(s) to your photo gallery for offline scanning.
               </div>
             </div>
 
+            <!-- Footer & Support Notice (Matching Paystack screenshot support contact) -->
             <div class="footer">
-              <p>Sent to <strong>${recipient}</strong> for order ${order.reference}.</p>
-              <p>© ${new Date().getFullYear()} Passiq Events. Instant QR Ticketing Infrastructure.</p>
+              <p style="margin:0 0 8px;color:#94a3b8;">
+                If you have any issues with payment or admission, kindly reply to this email or send an email to <a href="mailto:passiq.events@gmail.com">passiq.events@gmail.com</a>
+              </p>
+              <p style="margin:4px 0 0;font-size:11px;">
+                © ${new Date().getFullYear()} PASSIQ GLOBAL VENTURES LTD. All rights reserved.
+              </p>
             </div>
           </div>
         </body>
@@ -383,7 +506,8 @@ class EmailService {
 
       return await this.sendEmailSafe({
         to: recipient,
-        subject: `🎟️ Your Tickets for ${event?.title || 'Event'} - Passiq Events [Ref: ${order.reference}]`,
+        replyTo: 'Passiq.events@gmail.com',
+        subject: `🎟️ Your Tickets for ${event?.title || 'Event'} - PASSIQ GLOBAL VENTURES LTD [${order.reference}]`,
         html,
         attachments,
       });
@@ -395,4 +519,3 @@ class EmailService {
 }
 
 module.exports = EmailService;
-

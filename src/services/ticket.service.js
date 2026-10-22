@@ -41,6 +41,7 @@ class TicketService {
         eventTime: event.time || "18:00",
         eventLocation: event.location,
         eventImage: event.image || event.poster || "",
+        tierImage: tier?.image || event.image || event.poster || "",
         tierName,
         userName: order.attendeeName,
         userEmail: order.email,

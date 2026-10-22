@@ -44,6 +44,7 @@ const ticketSchema = new mongoose.Schema(
     eventTime: String,
     eventLocation: String,
     eventImage: String,
+    tierImage: String,
     tierName: String,
     userName: {
       type: String,
