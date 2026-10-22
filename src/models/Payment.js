@@ -14,7 +14,7 @@ const paymentSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      enum: ['paystack', 'flutterwave', 'stripe', 'crypto', 'cash', 'free'],
+      enum: ['paystack', 'flutterwave', 'stripe', 'crypto', 'cash', 'free', 'bank_transfer', 'local_transfer'],
       required: true
     },
     providerReference: {

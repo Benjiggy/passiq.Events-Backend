@@ -62,13 +62,17 @@ const orderSchema = new mongoose.Schema(
     },
     paymentProvider: {
       type: String,
-      enum: ['paystack', 'flutterwave', 'stripe', 'crypto', 'cash', 'free'],
+      enum: ['paystack', 'flutterwave', 'stripe', 'crypto', 'cash', 'free', 'bank_transfer', 'local_transfer'],
       default: 'paystack'
     },
     status: {
       type: String,
       enum: ['initialized', 'pending', 'success', 'failed', 'cancelled', 'refunded'],
       default: 'initialized'
+    },
+    proofOfPayment: {
+      type: String,
+      default: null
     },
     discountCode: {
       type: String,

@@ -166,6 +166,166 @@ const eventSchema = new mongoose.Schema(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
+        if (ret.category && typeof ret.category === "object" && ret.category.name) {
+          ret.categoryName = ret.category.name;
+          ret.category =
+            ret.category.name.toLowerCase() === "music & concerts"
+              ? "Music & Concerts"
+              : ret.category.name;
+        } else if (ret.category && String(ret.category) === "6ad3dbd83ca63b1d2ed0db41") {
+          ret.category = "Music & Concerts";
+        }
+        const rawTitle = ret.title || "";
+        const isBurna =
+          /burna\s*boy/i.test(rawTitle) ||
+          /weakness/i.test(rawTitle) ||
+          String(ret.id || ret._id) === "6ad685c5b93e2a37ef3dd857" ||
+          ret.slug === "burna-boy-live-no-sign-of-weakness-tour";
+
+        const isMarlian =
+          /marlian/i.test(rawTitle) ||
+          String(ret.id || ret._id) === "6ad8cdaa04730d435e513b1a";
+
+        const isWetParty =
+          /wet\s*party/i.test(rawTitle) ||
+          String(ret.id || ret._id) === "event-wet-party-coming-soon";
+
+        if (isBurna) {
+          ret.title = "Beach Vibez and Music: Guest Artist Invited.";
+          ret.subtitle = "Beach Vibez & Music with special guest artists invited live at Landmark Beach.";
+          ret.description = "Experience an unforgettable beach party with high-energy live music, seaside chill vibes, and special guest artist performances at Landmark Beach Arena, Victoria Island.";
+          ret.isClickable = false;
+          ret.comingSoon = true;
+          ret.priceDisplay = "Coming Soon";
+          ret.displayDate = "Coming Soon";
+          ret.formattedDate = "Coming Soon";
+          ret.organizer = ret.organizer || {};
+          ret.organizer.name = "Passiq Events";
+          ret.organizer.handle = "Admin-Passiq";
+          ret.organizer.avatar = "/passiq-logo.png";
+          ret.organizer.verified = true;
+          ret.organizer.partner = "";
+          ret.organizer.officialPartner = "";
+          ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
+        } else if (isWetParty) {
+          ret.isClickable = false;
+          ret.comingSoon = true;
+          ret.priceDisplay = "Coming Soon";
+          ret.displayDate = "Coming Soon";
+          ret.formattedDate = "Coming Soon";
+          ret.organizer = ret.organizer || {};
+          ret.organizer.name = "Passiq Events";
+          ret.organizer.handle = "Admin-Passiq";
+          ret.organizer.avatar = "/passiq-logo.png";
+          ret.organizer.verified = true;
+          ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
+        } else if (
+          ret.organizer &&
+          (isMarlian ||
+            ret.organizer.name === "agborex" ||
+            !ret.organizer.name ||
+            ret.organizer.name.includes("Sample"))
+        ) {
+          ret.organizer.name = "House Of Naya";
+          if (
+            !ret.organizer.handle ||
+            ret.organizer.handle === "organizer" ||
+            ret.organizer.handle.includes("sample")
+          ) {
+            ret.organizer.handle = "Admin-House Of Naya";
+          }
+          if (!ret.organizer.partner) {
+            ret.organizer.partner = "KRD (Kelvin Records)";
+            ret.organizer.officialPartner = "KRD (Kelvin Records)";
+          }
+          if (!ret.organizer.enquiries) {
+            ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
+          }
+        }
+        return ret;
+      },
+    },
+    toObject: {
+      transform: (doc, ret) => {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+        if (ret.category && typeof ret.category === "object" && ret.category.name) {
+          ret.categoryName = ret.category.name;
+          ret.category =
+            ret.category.name.toLowerCase() === "music & concerts"
+              ? "Music & Concerts"
+              : ret.category.name;
+        } else if (ret.category && String(ret.category) === "6ad3dbd83ca63b1d2ed0db41") {
+          ret.category = "Music & Concerts";
+        }
+        const rawTitle = ret.title || "";
+        const isBurna =
+          /burna\s*boy/i.test(rawTitle) ||
+          /weakness/i.test(rawTitle) ||
+          String(ret.id || ret._id) === "6ad685c5b93e2a37ef3dd857" ||
+          ret.slug === "burna-boy-live-no-sign-of-weakness-tour";
+
+        const isMarlian =
+          /marlian/i.test(rawTitle) ||
+          String(ret.id || ret._id) === "6ad8cdaa04730d435e513b1a";
+
+        const isWetParty =
+          /wet\s*party/i.test(rawTitle) ||
+          String(ret.id || ret._id) === "event-wet-party-coming-soon";
+
+        if (isBurna) {
+          ret.title = "Beach Vibez and Music: Guest Artist Invited.";
+          ret.subtitle = "Beach Vibez & Music with special guest artists invited live at Landmark Beach.";
+          ret.description = "Experience an unforgettable beach party with high-energy live music, seaside chill vibes, and special guest artist performances at Landmark Beach Arena, Victoria Island.";
+          ret.isClickable = false;
+          ret.comingSoon = true;
+          ret.priceDisplay = "Coming Soon";
+          ret.displayDate = "Coming Soon";
+          ret.formattedDate = "Coming Soon";
+          ret.organizer = ret.organizer || {};
+          ret.organizer.name = "Passiq Events";
+          ret.organizer.handle = "Admin-Passiq";
+          ret.organizer.avatar = "/passiq-logo.png";
+          ret.organizer.verified = true;
+          ret.organizer.partner = "";
+          ret.organizer.officialPartner = "";
+          ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
+        } else if (isWetParty) {
+          ret.isClickable = false;
+          ret.comingSoon = true;
+          ret.priceDisplay = "Coming Soon";
+          ret.displayDate = "Coming Soon";
+          ret.formattedDate = "Coming Soon";
+          ret.organizer = ret.organizer || {};
+          ret.organizer.name = "Passiq Events";
+          ret.organizer.handle = "Admin-Passiq";
+          ret.organizer.avatar = "/passiq-logo.png";
+          ret.organizer.verified = true;
+          ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
+        } else if (
+          ret.organizer &&
+          (isMarlian ||
+            ret.organizer.name === "agborex" ||
+            !ret.organizer.name ||
+            ret.organizer.name.includes("Sample"))
+        ) {
+          ret.organizer.name = "House Of Naya";
+          if (
+            !ret.organizer.handle ||
+            ret.organizer.handle === "organizer" ||
+            ret.organizer.handle.includes("sample")
+          ) {
+            ret.organizer.handle = "Admin-House Of Naya";
+          }
+          if (!ret.organizer.partner) {
+            ret.organizer.partner = "KRD (Kelvin Records)";
+            ret.organizer.officialPartner = "KRD (Kelvin Records)";
+          }
+          if (!ret.organizer.enquiries) {
+            ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
+          }
+        }
         return ret;
       },
     },

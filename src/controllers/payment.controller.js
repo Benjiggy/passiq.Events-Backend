@@ -1,3 +1,5 @@
+const path = require("path");
+const fs = require("fs");
 const dataStore = require("../models/dataStore");
 const ApiResponse = require("../utils/apiResponse");
 const PaystackService = require("../services/paystack.service");
@@ -5,6 +7,7 @@ const FlutterwaveService = require("../services/flutterwave.service");
 const StripeService = require("../services/stripe.service");
 const CryptoService = require("../services/crypto.service");
 const TicketService = require("../services/ticket.service");
+const EmailService = require("../services/email.service");
 const { generateReference, toKobo } = require("../utils/formatters");
 const logger = require("../utils/logger");
 
@@ -319,13 +322,218 @@ class PaymentController {
         paidAt: new Date(),
       });
 
-      // Issue Tickets
+      // Issue Tickets (TicketService automatically dispatches email with QR codes and amounts)
       const tickets = await TicketService.issueTicketsForOrder(order);
 
       return res.status(200).json({
         status: "success",
         success: true,
-        message: "Payment successfully verified. Tickets issued!",
+        message: "Payment successfully verified. Tickets issued and sent to your email!",
+        reference,
+        tickets,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Submit Local Bank Transfer with Proof of Payment
+   * POST /api/payments/local-transfer
+   */
+  static async submitLocalTransfer(req, res, next) {
+    try {
+      const {
+        eventId,
+        tierId,
+        quantity = 1,
+        attendeeName,
+        email,
+        phone,
+      } = req.body;
+
+      if (!eventId || !attendeeName || !email) {
+        return ApiResponse.error(
+          res,
+          "Event ID, attendee name, and email address are required.",
+          400,
+        );
+      }
+
+      if (!req.file && !req.body.proofImage && !req.body.proof) {
+        return ApiResponse.error(
+          res,
+          "Please upload your proof of payment image or receipt.",
+          400,
+        );
+      }
+
+      const numQuantity = Number(quantity);
+      if (
+        !Number.isSafeInteger(numQuantity) ||
+        numQuantity < 1 ||
+        numQuantity > 20
+      ) {
+        return ApiResponse.error(
+          res,
+          "Quantity must be between 1 and 20 tickets.",
+          400,
+        );
+      }
+
+      const event = await dataStore.getEventByIdOrSlug(eventId);
+      if (!event) {
+        return ApiResponse.error(res, "Event not found or unavailable.", 404);
+      }
+
+      const tiers = event.ticketTiers || [];
+      const tier =
+        tiers.find((t) => (t.id || t._id)?.toString() === tierId?.toString()) ||
+        tiers[0];
+      if (!tier) return ApiResponse.error(res, "Ticket tier not found.", 404);
+
+      const unitPrice = tier.price || 0;
+      const unitAmountKobo = tier.unitAmountKobo || toKobo(unitPrice);
+      const totalAmountKobo = unitAmountKobo * numQuantity;
+      const totalAmount = unitPrice * numQuantity;
+
+      const reference = generateReference("TRF");
+
+      // Handle proof file details
+      let proofUrl = "";
+      let proofFile = req.file || null;
+      let proofBuffer = null;
+
+      if (req.file) {
+        proofUrl = `/uploads/proofs/${req.file.filename}`;
+      } else if (req.body.proofImage || req.body.proof) {
+        const rawProof = req.body.proofImage || req.body.proof;
+        if (typeof rawProof === "string" && rawProof.startsWith("data:image")) {
+          const matches = rawProof.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            proofBuffer = Buffer.from(matches[2], "base64");
+            const ext = matches[1].includes("png") ? ".png" : ".jpg";
+            const filename = `proof_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
+            const uploadDir = path.join(__dirname, "../../uploads/proofs");
+            if (!fs.existsSync(uploadDir)) {
+              fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            const targetPath = path.join(uploadDir, filename);
+            fs.writeFileSync(targetPath, proofBuffer);
+            proofUrl = `/uploads/proofs/${filename}`;
+            proofFile = { path: targetPath, originalname: filename };
+          }
+        } else if (typeof rawProof === "string") {
+          proofUrl = rawProof;
+        }
+      }
+
+      // Save order record with all attendee information and proof to the database
+      const order = await dataStore.createOrder({
+        reference,
+        buyerId: req.user ? req.user.id : null,
+        ownerId: event.ownerId,
+        eventId: event.id || event._id,
+        tierId: tier.id || tier._id || "general",
+        quantity: numQuantity,
+        attendeeName: attendeeName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone ? phone.trim() : "",
+        unitAmountKobo,
+        amountKobo: totalAmountKobo,
+        amount: totalAmount,
+        currency: event.currency || "NGN",
+        paymentProvider: "bank_transfer",
+        status: "pending",
+        proofOfPayment: proofUrl,
+        metadata: {
+          eventTitle: event.title,
+          tierName: tier.name,
+          bankName: "Providus Bank",
+          accountName: "PASSIQ GLOBAL VENTURES LTD",
+          accountNumber: "1310926732",
+          proofFileUrl: proofUrl,
+        },
+      });
+
+      // Dispatch Email with proof of image to Passiq.events@gmail.com via Resend
+      const emailResult = await EmailService.sendLocalTransferProofNotification({
+        order,
+        event,
+        tier,
+        proofFile,
+        proofBuffer,
+      });
+
+      return res.status(201).json({
+        status: "success",
+        success: true,
+        message:
+          "Local bank transfer proof submitted successfully and sent to Passiq.events@gmail.com for review.",
+        data: {
+          reference,
+          orderId: order.id || order._id,
+          amount: totalAmount,
+          currency: event.currency || "NGN",
+          status: "pending",
+          emailNotificationSent: emailResult.success,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Confirm Bank Transfer & Issue Tickets
+   * POST /api/payments/confirm-transfer
+   */
+  static async confirmBankTransfer(req, res, next) {
+    try {
+      const { reference } = req.body;
+      if (!reference) {
+        return ApiResponse.error(res, "Order reference is required.", 400);
+      }
+
+      const order = await dataStore.getOrderByReference(reference);
+      if (!order) {
+        return ApiResponse.error(res, "Order not found with reference.", 404);
+      }
+
+      if (order.status === "success") {
+        const tickets = await dataStore.listTicketsByReference(reference);
+        return res.status(200).json({
+          status: "success",
+          success: true,
+          message: "Transfer payment already confirmed and tickets issued.",
+          reference,
+          tickets,
+        });
+      }
+
+      // Mark order successful
+      await dataStore.updateOrder(reference, { status: "success" });
+
+      // Create Payment log
+      await dataStore.createPayment({
+        reference,
+        orderId: order.id || order._id,
+        provider: "bank_transfer",
+        providerReference: reference,
+        amount: order.amount,
+        amountKobo: order.amountKobo,
+        currency: order.currency,
+        status: "success",
+        paidAt: new Date(),
+      });
+
+      // Issue Tickets and dispatch confirmation email with random QR codes
+      const tickets = await TicketService.issueTicketsForOrder(order);
+
+      return res.status(200).json({
+        status: "success",
+        success: true,
+        message: "Bank transfer confirmed successfully and tickets sent to attendee email.",
         reference,
         tickets,
       });

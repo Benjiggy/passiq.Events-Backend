@@ -2,10 +2,28 @@ const express = require('express');
 const router = express.Router();
 const PaymentController = require('../controllers/payment.controller');
 const { optionalAuth } = require('../middlewares/auth.middleware');
+const { uploadProof } = require('../middlewares/upload.middleware');
 
 // Checkout Initialization (Paystack, Flutterwave, Stripe, Crypto)
 router.post('/initialize', optionalAuth, PaymentController.initializePayment);
 router.post('/verify', optionalAuth, PaymentController.verifyPayment);
+
+// Local Bank Transfer with Proof of Payment Submission
+router.post(
+  '/local-transfer',
+  optionalAuth,
+  uploadProof.single('proof'),
+  PaymentController.submitLocalTransfer
+);
+router.post(
+  '/bank-transfer',
+  optionalAuth,
+  uploadProof.single('proof'),
+  PaymentController.submitLocalTransfer
+);
+
+// Confirm Bank Transfer & Dispatch Tickets
+router.post('/confirm-transfer', optionalAuth, PaymentController.confirmBankTransfer);
 
 // Dedicated Crypto Endpoints
 router.post('/crypto/initialize', optionalAuth, (req, res, next) => {

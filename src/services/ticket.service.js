@@ -1,5 +1,7 @@
+const crypto = require("crypto");
 const dataStore = require("../models/dataStore");
 const QrService = require("./qr.service");
+const EmailService = require("./email.service");
 const { generateTicketCode } = require("../utils/formatters");
 const logger = require("../utils/logger");
 
@@ -20,7 +22,9 @@ class TicketService {
 
     for (let i = 0; i < order.quantity; i++) {
       const ticketCode = generateTicketCode(event.slug || event.id, i + 1);
-      const qrToken = `PASSIQ-LIVE:${ticketCode}:${order.reference}`;
+      // Generate a cryptographically random token for every ticket QR code
+      const randomNonce = crypto.randomBytes(6).toString("hex").toUpperCase();
+      const qrToken = `PASSIQ-LIVE:${ticketCode}:${order.reference}:${randomNonce}`;
       const qrDataUrl = await QrService.generateQrCodeDataUrl(qrToken);
 
       const ticket = await dataStore.createTicket({
@@ -64,6 +68,24 @@ class TicketService {
         ticketTiers: event.ticketTiers,
         soldCount: event.soldCount,
       });
+    }
+
+    // Dispatch email notification with tickets, random QR codes, numbers and amount
+    try {
+      await EmailService.sendTicketPurchaseConfirmation({
+        order,
+        event,
+        tier,
+        tickets: issuedTickets,
+      });
+      logger.info(
+        `[TicketService] Confirmation email with ${issuedTickets.length} ticket(s) dispatched to ${order.email}`,
+      );
+    } catch (emailErr) {
+      logger.error(
+        `[TicketService] Error dispatching confirmation email to ${order.email}:`,
+        emailErr,
+      );
     }
 
     return issuedTickets;

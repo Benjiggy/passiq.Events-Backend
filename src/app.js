@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -20,7 +21,11 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:3000",
-  process.env.FRONTEND_URL,
+  "https://passiq.events",
+  "https://www.passiq.events",
+  ...(process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(",").map((s) => s.trim().replace(/\/+$/, ""))
+    : []),
 ].filter(Boolean);
 
 app.use(
@@ -30,11 +35,14 @@ app.use(
       if (
         !origin ||
         allowedOrigins.indexOf(origin) !== -1 ||
+        allowedOrigins.indexOf(origin.replace(/\/+$/, "")) !== -1 ||
+        origin.endsWith(".vercel.app") ||
+        origin.endsWith("passiq.events") ||
         process.env.NODE_ENV !== "production"
       ) {
         callback(null, true);
       } else {
-        callback(new Error("CORS origin not allowed"));
+        callback(new Error("CORS origin not allowed: " + origin));
       }
     },
     credentials: true,
@@ -54,9 +62,12 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 // Request Body Parsers
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 app.use(cookieParser());
+
+// Static Uploads Serving
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Rate Limiter
 const apiLimiter = rateLimit({
