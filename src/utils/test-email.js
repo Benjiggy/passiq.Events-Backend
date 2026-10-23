@@ -39,7 +39,7 @@ const html = EmailService.renderTemplate("ticket-confirmation", {
 
 (async () => {
   const result = await EmailService.sendEmailSafe({
-    to: "agboe4102@gmail.com",
+    to: "benjaminejike859@gmail.com",
     replyTo: "Passiq.events@gmail.com",
     subject: "Your Tickets for Event - PASSIQ GLOBAL VENTURES LTD [TEST]",
     html,

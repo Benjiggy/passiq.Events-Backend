@@ -100,53 +100,52 @@
       .tier-banner-img {
         width: 100%;
         height: auto;
-        max-height: 240px;
+        max-height: 220px;
         object-fit: cover;
         display: block;
       }
-      .tier-banner-caption {
-        padding: 12px 18px;
+      .tier-banner-label {
+        padding: 10px 16px;
+        font-size: 12px;
+        color: #94a3b8;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: #161c24;
-        font-size: 13px;
+        border-top: 1px solid #242c38;
       }
 
-      /* Transaction Details Table */
+      /* Details Card */
       .details-card {
         background: #161c24;
-        border-radius: 16px;
-        border: 1px solid #262e3b;
-        padding: 18px 20px;
-        margin-bottom: 28px;
+        border: 1px solid #242c38;
+        border-radius: 18px;
+        padding: 20px 24px;
+        margin-bottom: 24px;
       }
       .card-title {
         font-size: 12px;
         font-weight: 800;
         color: #ccff00;
         text-transform: uppercase;
-        letter-spacing: 1px;
-        margin: 0 0 14px;
-        border-bottom: 1px solid #232b38;
-        padding-bottom: 8px;
+        letter-spacing: 1.5px;
+        margin-bottom: 14px;
       }
       .detail-row {
         display: flex;
         justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #1f2733;
         font-size: 13px;
-        padding: 7px 0;
-        border-bottom: 1px solid #1c232d;
       }
       .detail-row:last-child {
         border-bottom: none;
+        padding-bottom: 0;
       }
       .detail-label {
         color: #94a3b8;
-        font-weight: 500;
       }
       .detail-value {
-        color: #ffffff;
+        color: #f1f5f9;
         font-weight: 700;
         text-align: right;
       }
@@ -207,13 +206,13 @@
       <div class="receipt-banner">
         <div class="merchant-title">PASSIQ GLOBAL VENTURES LTD</div>
         <div class="receipt-note">received your payment of</div>
-        <div class="total-amount">{{ formattedTotal }}</div>
+        <div class="total-amount">: {{formattedTotal}}</div>
         <div class="verified-badge">✓ Paid via Paystack • Confirmed</div>
       </div>
 
       <div class="content">
         <!-- Purchased Tier Banner (if available) -->
-        {{ tierBanner }}
+        {{tierBanner}}
 
         <!-- Transaction & Event Details Card -->
         <div class="details-card">
@@ -221,39 +220,39 @@
 
           <div class="detail-row">
             <span class="detail-label">Event</span>
-            <span class="detail-value">{{ eventTitle }}</span>
+            <span class="detail-value">: {{eventTitle}}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Reference</span>
             <span
               class="detail-value"
               style="font-family: monospace; color: #ccff00"
-              >{{ reference }}</span
+              >: {{reference}}</span
             >
           </div>
           <div class="detail-row">
             <span class="detail-label">Payment Date</span>
-            <span class="detail-value">{{ paymentDate }}</span>
+            <span class="detail-value">: {{paymentDate}}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Attendee Name</span>
-            <span class="detail-value">{{ attendeeName }}</span>
+            <span class="detail-value">: {{attendeeName}}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Purchased Pass Tier</span>
-            <span class="detail-value">{{ tierName }}</span>
+            <span class="detail-value">: {{tierName}}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Quantity</span>
-            <span class="detail-value">{{ ticketCountText }}</span>
+            <span class="detail-value">: {{ticketCountText}}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Event Date & Time</span>
-            <span class="detail-value">{{ eventDate }} at {{ eventTime }}</span>
+            <span class="detail-value">: {{eventDate}} at {{eventTime}}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Venue</span>
-            <span class="detail-value">{{ eventLocation }}</span>
+            <span class="detail-value">: {{eventLocation}}</span>
           </div>
         </div>
 
@@ -264,7 +263,7 @@
         </div>
 
         <!-- Individual Ticket Pass Cards (1, 2, 3 or more tickets) -->
-        {{ ticketCards }}
+        {{ticketCards}}
 
         <!-- Gate Tips -->
         <div class="gate-notice">
@@ -282,7 +281,7 @@
           <a href="mailto:passiq.events@gmail.com">passiq.events@gmail.com</a>
         </p>
         <p style="margin: 4px 0 0; font-size: 11px">
-          © {{ year }} PASSIQ GLOBAL VENTURES LTD. All rights reserved.
+          © {{year}} PASSIQ GLOBAL VENTURES LTD. All rights reserved.
         </p>
       </div>
     </div>
