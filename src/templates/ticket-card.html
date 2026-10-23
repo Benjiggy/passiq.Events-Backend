@@ -1,0 +1,148 @@
+<div
+  style="
+    background: #141921;
+    border: 1.5px solid #2d3748;
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    position: relative;
+    overflow: hidden;
+  "
+>
+  <!-- Top Pass Bar -->
+  <div
+    style="
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      border-bottom: 1px dashed #2d3748;
+      padding-bottom: 12px;
+    "
+  >
+    <span
+      style="
+        font-size: 11px;
+        font-weight: 800;
+        color: #ccff00;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        background: rgba(204, 255, 0, 0.12);
+        padding: 4px 10px;
+        border-radius: 6px;
+      "
+    >
+      🎟️ Ticket Pass {{index}} of {{ticketCount}}
+    </span>
+    <span
+      style="
+        font-size: 12px;
+        font-weight: 700;
+        color: #f1f5f9;
+        letter-spacing: 0.5px;
+      "
+    >
+      {{passTierName}}
+    </span>
+  </div>
+
+  <!-- Tier picture on each pass (if available) -->
+  {{ticketImage}}
+
+  <!-- Scannable Gate QR Code (Loads reliably in Gmail, Outlook, Apple Mail) -->
+  <div
+    style="
+      background: #ffffff;
+      padding: 14px;
+      border-radius: 18px;
+      display: inline-block;
+      margin: 12px auto;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    "
+  >
+    <img
+      src="{{qrImageUrl}}"
+      alt="Gate QR Code for Ticket {{ticketCode}}"
+      width="200"
+      height="200"
+      style="display: block; margin: 0 auto; border: none"
+    />
+  </div>
+
+  <div style="margin-top: 6px">
+    <a
+      href="{{qrToken}}"
+      target="_blank"
+      style="
+        display: inline-block;
+        font-size: 11px;
+        color: #ccff00;
+        text-decoration: none;
+        font-weight: 700;
+        padding: 5px 12px;
+        background: #1a2332;
+        border-radius: 6px;
+        border: 1px solid #2d3b4e;
+      "
+    >
+      📱 View Live Ticket Pass ↗
+    </a>
+  </div>
+
+  <!-- Ticket Identification Number -->
+  <div style="margin-top: 14px">
+    <div
+      style="
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #94a3b8;
+        letter-spacing: 1px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      "
+    >
+      Official Ticket Number
+    </div>
+    <div
+      style="
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 19px;
+        font-weight: 900;
+        color: #ccff00;
+        letter-spacing: 2.5px;
+        background: #0d1117;
+        display: inline-block;
+        padding: 6px 16px;
+        border-radius: 8px;
+        border: 1px solid #232b36;
+      "
+    >
+      {{ticketCode}}
+    </div>
+  </div>
+
+  <!-- Ticket Price & Admission Status -->
+  <div
+    style="
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-around;
+      font-size: 12px;
+      color: #cbd5e1;
+      padding-top: 12px;
+      border-top: 1px dashed #232b36;
+    "
+  >
+    <div>Tier: <strong style="color: #ffffff">{{passTierName}}</strong></div>
+    <div>Price: <strong style="color: #ffffff">{{formattedPrice}}</strong></div>
+    <div>Status: <strong style="color: #4ade80">Active Pass</strong></div>
+  </div>
+
+  <div style="margin-top: 12px; font-size: 11px; color: #64748b">
+    🔒 Valid for 1 single admission scan at the entrance gate
+  </div>
+</div>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your Passiq Events Receipt & Ticket Pass</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        background-color: #0b0d10;
+        color: #f1f5f9;
+        margin: 0;
+        padding: 20px 10px;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #11151c;
+        border-radius: 24px;
+        border: 1px solid #232b38;
+        overflow: hidden;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      }
+      .brand-header {
+        background: #161c24;
+        padding: 24px 30px;
+        text-align: center;
+        border-bottom: 1px solid #242c38;
+      }
+      .brand-logo {
+        font-size: 24px;
+        font-weight: 900;
+        color: #ccff00;
+        letter-spacing: -0.5px;
+        margin: 0;
+      }
+      .brand-subtitle {
+        font-size: 12px;
+        color: #94a3b8;
+        margin: 4px 0 0;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+      }
+
+      /* Paystack Receipt Highlight Box */
+      .receipt-banner {
+        background: #1a222e;
+        border: 1px solid #2d3848;
+        border-radius: 18px;
+        padding: 24px;
+        margin: 24px;
+        text-align: center;
+      }
+      .merchant-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: #cbd5e1;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+      }
+      .receipt-note {
+        font-size: 13px;
+        color: #94a3b8;
+        margin: 6px 0 10px;
+      }
+      .total-amount {
+        font-size: 36px;
+        font-weight: 900;
+        color: #ccff00;
+        letter-spacing: -1px;
+        margin: 8px 0;
+      }
+      .verified-badge {
+        display: inline-block;
+        background: rgba(74, 222, 128, 0.15);
+        color: #4ade80;
+        border: 1px solid rgba(74, 222, 128, 0.3);
+        padding: 4px 12px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .content {
+        padding: 0 24px 24px;
+      }
+
+      /* Cloudinary Tier Banner Feature */
+      .tier-banner-box {
+        margin-bottom: 24px;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid #2d3848;
+        background: #161c24;
+      }
+      .tier-banner-img {
+        width: 100%;
+        height: auto;
+        max-height: 240px;
+        object-fit: cover;
+        display: block;
+      }
+      .tier-banner-caption {
+        padding: 12px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #161c24;
+        font-size: 13px;
+      }
+
+      /* Transaction Details Table */
+      .details-card {
+        background: #161c24;
+        border-radius: 16px;
+        border: 1px solid #262e3b;
+        padding: 18px 20px;
+        margin-bottom: 28px;
+      }
+      .card-title {
+        font-size: 12px;
+        font-weight: 800;
+        color: #ccff00;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 0 0 14px;
+        border-bottom: 1px solid #232b38;
+        padding-bottom: 8px;
+      }
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        padding: 7px 0;
+        border-bottom: 1px solid #1c232d;
+      }
+      .detail-row:last-child {
+        border-bottom: none;
+      }
+      .detail-label {
+        color: #94a3b8;
+        font-weight: 500;
+      }
+      .detail-value {
+        color: #ffffff;
+        font-weight: 700;
+        text-align: right;
+      }
+
+      /* Pass Header */
+      .passes-heading {
+        text-align: center;
+        margin: 28px 0 16px;
+      }
+      .passes-heading h2 {
+        font-size: 18px;
+        font-weight: 900;
+        color: #ffffff;
+        margin: 0;
+      }
+      .passes-heading p {
+        font-size: 12px;
+        color: #94a3b8;
+        margin: 4px 0 0;
+      }
+
+      .gate-notice {
+        background: rgba(204, 255, 0, 0.06);
+        border: 1px solid rgba(204, 255, 0, 0.2);
+        border-radius: 14px;
+        padding: 16px;
+        font-size: 12px;
+        color: #cbd5e1;
+        text-align: center;
+        margin-top: 20px;
+      }
+      .footer {
+        background: #0c0f14;
+        padding: 24px 30px;
+        text-align: center;
+        font-size: 12px;
+        color: #64748b;
+        border-top: 1px solid #1c232d;
+      }
+      .footer a {
+        color: #ccff00;
+        text-decoration: none;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Brand Header -->
+      <div class="brand-header">
+        <div class="brand-logo">Passiq.Events</div>
+        <div class="brand-subtitle">
+          Official Ticket Receipt & Admission Pass
+        </div>
+      </div>
+
+      <!-- Receipt from PASSIQ GLOBAL VENTURES LTD -->
+      <div class="receipt-banner">
+        <div class="merchant-title">PASSIQ GLOBAL VENTURES LTD</div>
+        <div class="receipt-note">received your payment of</div>
+        <div class="total-amount">{{ formattedTotal }}</div>
+        <div class="verified-badge">✓ Paid via Paystack • Confirmed</div>
+      </div>
+
+      <div class="content">
+        <!-- Purchased Tier Banner (if available) -->
+        {{ tierBanner }}
+
+        <!-- Transaction & Event Details Card -->
+        <div class="details-card">
+          <div class="card-title">Transaction & Event Details</div>
+
+          <div class="detail-row">
+            <span class="detail-label">Event</span>
+            <span class="detail-value">{{ eventTitle }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Reference</span>
+            <span
+              class="detail-value"
+              style="font-family: monospace; color: #ccff00"
+              >{{ reference }}</span
+            >
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Payment Date</span>
+            <span class="detail-value">{{ paymentDate }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Attendee Name</span>
+            <span class="detail-value">{{ attendeeName }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Purchased Pass Tier</span>
+            <span class="detail-value">{{ tierName }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Quantity</span>
+            <span class="detail-value">{{ ticketCountText }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Event Date & Time</span>
+            <span class="detail-value">{{ eventDate }} at {{ eventTime }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Venue</span>
+            <span class="detail-value">{{ eventLocation }}</span>
+          </div>
+        </div>
+
+        <!-- Passes Heading -->
+        <div class="passes-heading">
+          <h2>Your Admission Passes & Gate QR Codes</h2>
+          <p>Present the QR code(s) below at the gate scanner for admission</p>
+        </div>
+
+        <!-- Individual Ticket Pass Cards (1, 2, 3 or more tickets) -->
+        {{ ticketCards }}
+
+        <!-- Gate Tips -->
+        <div class="gate-notice">
+          💡 <strong>Gate Scanner Tip:</strong> You can open this email directly
+          on your phone at the entrance, or save the attached QR code image(s)
+          to your photo gallery for offline scanning.
+        </div>
+      </div>
+
+      <!-- Footer & Support Notice -->
+      <div class="footer">
+        <p style="margin: 0 0 8px; color: #94a3b8">
+          If you have any issues with payment or admission, kindly reply to this
+          email or send an email to
+          <a href="mailto:passiq.events@gmail.com">passiq.events@gmail.com</a>
+        </p>
+        <p style="margin: 4px 0 0; font-size: 11px">
+          © {{ year }} PASSIQ GLOBAL VENTURES LTD. All rights reserved.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

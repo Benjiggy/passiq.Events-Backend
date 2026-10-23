@@ -1,0 +1,25 @@
+<div
+  style="
+    background: #fff3cd;
+    color: #856404;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-family: sans-serif;
+    font-size: 13px;
+    border: 1px solid #ffeeba;
+  "
+>
+  <strong>⚠️ Resend Sandbox Notice:</strong> This receipt & ticket pass was
+  intended for <strong>{{to}}</strong>.<br />
+  Because this Resend account is currently in sandbox testing mode, it was
+  forwarded to the account owner (<strong>{{devEmail}}</strong>).<br />
+  <em
+    >To deliver directly to {{to}} and all attendee emails, please verify your
+    custom domain (e.g. passiq.events) at
+    <a href="https://resend.com/domains" target="_blank" style="color: #0056b3"
+      >resend.com/domains</a
+    >
+    and set RESEND_FROM_EMAIL in .env.</em
+  >
+</div>

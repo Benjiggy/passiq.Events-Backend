@@ -1,0 +1,197 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        background-color: #0b0d10;
+        color: #f1f5f9;
+        margin: 0;
+        padding: 24px;
+      }
+      .container {
+        max-width: 620px;
+        margin: 0 auto;
+        background: #13171d;
+        border-radius: 20px;
+        border: 1px solid #232933;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+      .header {
+        background: #181d24;
+        padding: 24px 32px;
+        border-bottom: 1px solid #232933;
+        text-align: center;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 20px;
+        color: #ccff00;
+        letter-spacing: -0.5px;
+      }
+      .header p {
+        margin: 6px 0 0;
+        color: #94a3b8;
+        font-size: 13px;
+      }
+      .content {
+        padding: 32px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: rgba(204, 255, 0, 0.15);
+        color: #ccff00;
+        border: 1px solid rgba(204, 255, 0, 0.3);
+        margin-bottom: 16px;
+      }
+      .amount-box {
+        background: rgba(204, 255, 0, 0.08);
+        border: 1px solid rgba(204, 255, 0, 0.25);
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 24px;
+      }
+      .amount-box .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #ccff00;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+      .amount-box .value {
+        font-size: 28px;
+        font-weight: 900;
+        color: #ccff00;
+        margin-top: 4px;
+      }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 24px;
+      }
+      .table td {
+        padding: 12px 0;
+        border-bottom: 1px solid #1e242c;
+        font-size: 13px;
+      }
+      .table td.label {
+        color: #94a3b8;
+        width: 38%;
+        font-weight: 500;
+      }
+      .table td.value {
+        color: #ffffff;
+        font-weight: 600;
+        text-align: right;
+      }
+      .proof-section {
+        background: #181d24;
+        border-radius: 14px;
+        padding: 18px;
+        border: 1px solid #28303d;
+        text-align: center;
+        margin-top: 20px;
+      }
+      .proof-section h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        color: #ffffff;
+      }
+      .proof-img {
+        max-width: 100%;
+        max-height: 400px;
+        border-radius: 10px;
+        border: 1px solid #333d4d;
+      }
+      .footer {
+        background: #0e1115;
+        padding: 20px 32px;
+        text-align: center;
+        font-size: 12px;
+        color: #64748b;
+        border-top: 1px solid #1e242c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Passiq.Events — Local Bank Transfer Received</h1>
+        <p>Action Required: Review bank receipt and confirm ticket order</p>
+      </div>
+      <div class="content">
+        <span class="badge">PROVIDUS BANK TRANSFER</span>
+
+        <div class="amount-box">
+          <div class="label">Total Amount Paid</div>
+          <div class="value">{{formattedTotal}}</div>
+        </div>
+
+        <table class="table">
+          <tr>
+            <td class="label">Event Title</td>
+            <td class="value">{{eventTitle}}</td>
+          </tr>
+          <tr>
+            <td class="label">Order Reference</td>
+            <td class="value">
+              <code
+                style="
+                  color: #ccff00;
+                  background: #0d1117;
+                  padding: 2px 6px;
+                  border-radius: 4px;
+                "
+                >{{reference}}</code
+              >
+            </td>
+          </tr>
+          <tr>
+            <td class="label">Attendee Full Name</td>
+            <td class="value">{{attendeeName}}</td>
+          </tr>
+          <tr>
+            <td class="label">Attendee Email</td>
+            <td class="value">{{attendeeEmail}}</td>
+          </tr>
+          <tr>
+            <td class="label">Attendee Phone</td>
+            <td class="value">{{attendeePhone}}</td>
+          </tr>
+          <tr>
+            <td class="label">Ticket Tier</td>
+            <td class="value">{{tierName}}</td>
+          </tr>
+          <tr>
+            <td class="label">Quantity</td>
+            <td class="value">{{quantityText}}</td>
+          </tr>
+          <tr>
+            <td class="label">Beneficiary Account</td>
+            <td class="value">
+              Providus Bank (1310926732) - PASSIQ GLOBAL VENTURES LTD
+            </td>
+          </tr>
+          <tr>
+            <td class="label">Submission Date</td>
+            <td class="value">{{submissionTime}}</td>
+          </tr>
+        </table>
+
+        {{proofSection}}
+      </div>
+      <div class="footer">
+        <p>© {{year}} Passiq Events. Automated Transfer Notification Desk.</p>
+      </div>
+    </div>
+  </body>
+</html>
