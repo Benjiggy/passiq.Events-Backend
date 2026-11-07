@@ -12,6 +12,7 @@ Built with **Node.js, Express, and JavaScript (ES6+)**.
 - **Events Engine**: Category filtering, dynamic ticket tiers, capacity tracking, slug routing.
 - **Multi-Payment Gateways**:
   - **Paystack** (NGN, GHS, KES, ZAR cards, USSD, bank transfer).
+  quick fixed!!
   - **Flutterwave** (Pan-African payments & Mobile Money).
   - **Stripe** (International USD, EUR, GBP, Apple Pay, Google Pay).
   - **Crypto Payments** (USDT TRC20/ERC20, USDC, BTC, ETH, SOL with on-chain conversion and QR codes).
