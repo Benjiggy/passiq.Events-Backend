@@ -185,18 +185,9 @@ const dataStore = {
   },
 
   async getEventByIdOrSlug(idOrSlug) {
-<<<<<<< HEAD
     const target = String(idOrSlug || "").toLowerCase();
     const isBeachTarget =
       target === "beach-vibez-and-music" || target.includes("beach-vibez");
-=======
-    if (!idOrSlug) return null;
-    const strId = String(idOrSlug || "").trim();
-    const target = strId.toLowerCase();
-    const isBeachTarget = target === "beach-vibez-and-music" || target.includes("beach-vibez");
-    const isObjectId = /^[0-9a-fA-F]{24}$/.test(strId);
-
->>>>>>> e1ee2db9575673c1b2a6145eebdb8c7c2b881317
     if (isDbConnected()) {
       const orConditions = [{ slug: target }];
       if (isObjectId) {
