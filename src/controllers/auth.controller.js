@@ -1,9 +1,12 @@
+require("dotenv").config();
 const dataStore = require("../models/dataStore");
+const EmailService = require("../services/email.service");
 const ApiResponse = require("../utils/apiResponse");
 const {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
+  verifyAccessToken,
 } = require("../utils/tokenGenerator");
 const bcrypt = require("bcryptjs");
 
@@ -75,6 +78,11 @@ class AuthController {
         path: "/",
       });
 
+      await EmailService.sendEmailVerification({
+        user,
+        token,
+      });
+
       const safeUser = {
         id: user.id || user._id,
         name: user.name,
@@ -97,6 +105,25 @@ class AuthController {
       );
     } catch (error) {
       next(error);
+    }
+  }
+
+  static async verifyEmail(req, res) {
+    try {
+      const { token, email } = req.query;
+
+      const decoded = verifyAccessToken(token);
+
+      const user = await dataStore.verifyUserEmail(decoded, email);
+
+      await EmailService.sendEmailVerificationConfirmation({
+        user,
+      });
+
+      // Redirect the user to the login page
+      res.redirect(`${process.env.FRONTEND_URL}/login`);
+    } catch (err) {
+      res.status(500).json({ message: "Invalid or expired token" });
     }
   }
 
@@ -264,14 +291,6 @@ class AuthController {
     res.clearCookie("accessToken");
     res.clearCookie("refreshToken");
     return ApiResponse.success(res, "Logged out successfully");
-  }
-
-  /**
-   * Verify Email
-   * POST /api/auth/verify-email
-   */
-  static async verifyEmail(req, res) {
-    return ApiResponse.success(res, "Email verified successfully");
   }
 
   /**

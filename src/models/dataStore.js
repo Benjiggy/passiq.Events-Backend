@@ -76,6 +76,27 @@ const dataStore = {
     return user;
   },
 
+  async verifyUserEmail(decodedToken, email) {
+    const user = await User.findOne({ email });
+
+    if (decodedToken.email !== email) {
+      return res.status(400).json({ message: "Invalid verification link" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: "User already verified" });
+    }
+
+    user.isEmailVerified = true;
+    await user.save();
+
+    return user;
+  },
+
   async updateUser(id, updateData) {
     if (isDbConnected()) {
       return await User.findByIdAndUpdate(id, updateData, { new: true });
@@ -165,7 +186,8 @@ const dataStore = {
 
   async getEventByIdOrSlug(idOrSlug) {
     const target = String(idOrSlug || "").toLowerCase();
-    const isBeachTarget = target === "beach-vibez-and-music" || target.includes("beach-vibez");
+    const isBeachTarget =
+      target === "beach-vibez-and-music" || target.includes("beach-vibez");
     if (isDbConnected()) {
       return await Event.findOne({
         $or: [
@@ -186,7 +208,8 @@ const dataStore = {
           (e.id || e._id)?.toString().toLowerCase() === target ||
           e.slug?.toLowerCase() === target ||
           (isBeachTarget &&
-            (e.slug?.toLowerCase() === "burna-boy-live-no-sign-of-weakness-tour" ||
+            (e.slug?.toLowerCase() ===
+              "burna-boy-live-no-sign-of-weakness-tour" ||
               (e.id || e._id)?.toString() === "6ad685c5b93e2a37ef3dd857")),
       ) || null
     );

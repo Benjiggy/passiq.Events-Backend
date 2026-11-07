@@ -21,20 +21,20 @@ const EmailService = require("../services/email.service");
 //   );
 // };
 
-const html = EmailService.renderTemplate("ticket-confirmation", {
-  "{{formattedTotal}}": "2000",
-  "{{tierBanner}}": "",
-  "{{eventTitle}}": "Event Registration",
-  "{{reference}}": "24838yfz",
-  "{{paymentDate}}": "today",
-  "{{attendeeName}}": "agborex",
-  "{{tierName}}": "regular pass",
-  "{{ticketCountText}}": 1,
-  "{{eventDate}}": "As announced",
-  "{{eventTime}}": "18:00",
-  "{{eventLocation}}": "Venue on pass",
-  "{{ticketCards}}": "",
-  "{{year}}": String(new Date().getFullYear()),
+const html = EmailService.renderTemplate("register", {
+  "{{name}}": "2000",
+  "{{verification_link}}": "",
+  // "{{eventTitle}}": "Event Registration",
+  // "{{reference}}": "24838yfz",
+  // "{{paymentDate}}": "today",
+  // "{{attendeeName}}": "agborex",
+  // "{{tierName}}": "regular pass",
+  // "{{ticketCountText}}": 1,
+  // "{{eventDate}}": "As announced",
+  // "{{eventTime}}": "18:00",
+  // "{{eventLocation}}": "Venue on pass",
+  // "{{ticketCards}}": "",
+  // "{{year}}": String(new Date().getFullYear()),
 });
 
 (async () => {

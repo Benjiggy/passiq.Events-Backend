@@ -422,6 +422,50 @@ class EmailService {
       return { success: false, error: err.message };
     }
   }
+
+  static async sendEmailVerification({ user, token }) {
+    try {
+      const recipient = user.email;
+
+      const html = renderTemplate("register", {
+        "{{name}}": escapeHtml(user.name),
+        "{{verification_link}}": `${process.env.SERVER_URL}/api/verify-email?token=${token}&email=${user.email}`,
+      });
+
+      return await EmailService.sendEmailSafe({
+        to: recipient,
+        replyTo: "Passiq.events@gmail.com",
+        subject: `Welcome to Passiq Events - Verify Your Email`,
+        html,
+      });
+    } catch (err) {
+      logger.error("[EmailService] Error in sendEmailVerification:", err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  static async sendEmailVerificationConfirmation({ user }) {
+    try {
+      const recipient = user.email;
+
+      const html = renderTemplate("welcome", {
+        "{{name}}": escapeHtml(user.name),
+      });
+
+      return await EmailService.sendEmailSafe({
+        to: recipient,
+        replyTo: "Passiq.events@gmail.com",
+        subject: `Welcome to Passiq Events - Email Verified`,
+        html,
+      });
+    } catch (err) {
+      logger.error(
+        "[EmailService] Error in sendEmailVerificationConfirmation:",
+        err,
+      );
+      return { success: false, error: err.message };
+    }
+  }
 }
 
 module.exports = EmailService;
