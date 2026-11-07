@@ -185,22 +185,30 @@ const dataStore = {
   },
 
   async getEventByIdOrSlug(idOrSlug) {
+<<<<<<< HEAD
     const target = String(idOrSlug || "").toLowerCase();
     const isBeachTarget =
       target === "beach-vibez-and-music" || target.includes("beach-vibez");
+=======
+    if (!idOrSlug) return null;
+    const strId = String(idOrSlug || "").trim();
+    const target = strId.toLowerCase();
+    const isBeachTarget = target === "beach-vibez-and-music" || target.includes("beach-vibez");
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(strId);
+
+>>>>>>> e1ee2db9575673c1b2a6145eebdb8c7c2b881317
     if (isDbConnected()) {
-      return await Event.findOne({
-        $or: [
-          { slug: idOrSlug.toLowerCase() },
-          { _id: idOrSlug.match(/^[0-9a-fA-F]{24}$/) ? idOrSlug : null },
-          ...(isBeachTarget
-            ? [
-                { slug: "burna-boy-live-no-sign-of-weakness-tour" },
-                { _id: "6ad685c5b93e2a37ef3dd857" },
-              ]
-            : []),
-        ],
-      }).populate("category");
+      const orConditions = [{ slug: target }];
+      if (isObjectId) {
+        orConditions.push({ _id: strId });
+      }
+      if (isBeachTarget) {
+        orConditions.push(
+          { slug: "burna-boy-live-no-sign-of-weakness-tour" },
+          { _id: "6ad685c5b93e2a37ef3dd857" },
+        );
+      }
+      return await Event.findOne({ $or: orConditions }).populate("category");
     }
     return (
       memoryStore.events.find(
@@ -301,20 +309,23 @@ const dataStore = {
   },
 
   async getTicketByCodeOrId(codeOrId) {
+    if (!codeOrId) return null;
+    const strCode = String(codeOrId || "").trim();
+    const target = strCode.toUpperCase();
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(strCode);
+
     if (isDbConnected()) {
-      return await Ticket.findOne({
-        $or: [
-          { ticketCode: codeOrId.toUpperCase() },
-          { _id: codeOrId.match(/^[0-9a-fA-F]{24}$/) ? codeOrId : null },
-        ],
-      });
+      const orConditions = [{ ticketCode: target }];
+      if (isObjectId) {
+        orConditions.push({ _id: strCode });
+      }
+      return await Ticket.findOne({ $or: orConditions });
     }
-    const target = String(codeOrId || "").toUpperCase();
     return (
       memoryStore.tickets.find(
         (t) =>
           t.ticketCode?.toUpperCase() === target ||
-          (t.id || t._id)?.toString() === codeOrId,
+          (t.id || t._id)?.toString() === strCode,
       ) || null
     );
   },

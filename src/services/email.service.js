@@ -80,19 +80,47 @@ function escapeHtml(value) {
  * e.g. { "{{fullName}}": "Agbo Emmanuel" }
  */
 function renderTemplate(templateName, placeholders = {}) {
-  const templatePath = path.join(
+  let templatePath = path.join(
     __dirname,
     "../templates",
     `${templateName}.html`,
   );
+  if (!fs.existsSync(templatePath)) {
+    const altName = templateName.includes("-")
+      ? templateName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+      : templateName.replace(/([A-Z])/g, "-$1").toLowerCase();
+    const altPath = path.join(__dirname, "../templates", `${altName}.html`);
+    if (fs.existsSync(altPath)) {
+      templatePath = altPath;
+    }
+  }
   const html = fs.readFileSync(templatePath, "utf-8");
 
-  // Single pass so a replaced value can never be re-processed as a placeholder
-  return html.replace(/\{\{\s*\w+\s*\}\}/g, (match) =>
-    Object.prototype.hasOwnProperty.call(placeholders, match)
-      ? placeholders[match]
-      : match,
-  );
+  // Build a normalized lookup map that accepts any variation:
+  // "key", "{{key}}", or "{{ key }}" with or without whitespace
+  const lookup = {};
+  for (const [rawKey, val] of Object.entries(placeholders)) {
+    const cleanKey = String(rawKey)
+      .replace(/^\{\{\s*/, "")
+      .replace(/\s*\}\}$/, "")
+      .trim();
+    const stringVal = val === null || val === undefined ? "" : String(val);
+    lookup[cleanKey] = stringVal;
+    lookup[`{{${cleanKey}}}`] = stringVal;
+  }
+
+  // Single pass replacing any {{ varName }} or {{varName}}
+  return html.replace(/\{\{\s*([\w-]+)\s*\}\}/g, (match, varName) => {
+    const key = varName.trim();
+    if (Object.prototype.hasOwnProperty.call(lookup, key)) {
+      return lookup[key];
+    }
+    if (Object.prototype.hasOwnProperty.call(placeholders, match)) {
+      const val = placeholders[match];
+      return val === null || val === undefined ? "" : String(val);
+    }
+    return match;
+  });
 }
 
 class EmailService {
