@@ -2,6 +2,7 @@
  * Hybrid Data Repository
  * Provides unified interface across MongoDB models and robust in-memory data store.
  */
+const mongoose = require("mongoose");
 const { isDbConnected } = require("../config/db");
 const User = require("./User");
 const Event = require("./Event");
