@@ -185,32 +185,52 @@ const dataStore = {
   },
 
   async getEventByIdOrSlug(idOrSlug) {
-    const target = String(idOrSlug || "").toLowerCase();
+    const target = String(idOrSlug || "")
+      .trim()
+      .toLowerCase();
+
+    if (!target) return null;
+
     const isBeachTarget =
       target === "beach-vibez-and-music" || target.includes("beach-vibez");
+
+    const beachFallbackSlug = "burna-boy-live-no-sign-of-weakness-tour";
+
+    const beachFallbackId = "6ad685c5b93e2a37ef3dd857";
+
     if (isDbConnected()) {
       const orConditions = [{ slug: target }];
-      if (isObjectId) {
-        orConditions.push({ _id: strId });
+
+      // Check if the target is a valid MongoDB ObjectId
+      if (mongoose.Types.ObjectId.isValid(target)) {
+        orConditions.push({ _id: target });
       }
+
+      // Handle the Beach Vibez legacy reference
       if (isBeachTarget) {
         orConditions.push(
-          { slug: "burna-boy-live-no-sign-of-weakness-tour" },
-          { _id: "6ad685c5b93e2a37ef3dd857" },
+          { slug: beachFallbackSlug },
+          { _id: beachFallbackId },
         );
       }
-      return await Event.findOne({ $or: orConditions }).populate("category");
+
+      return await Event.findOne({
+        $or: orConditions,
+      }).populate("category");
     }
+
     return (
-      memoryStore.events.find(
-        (e) =>
-          (e.id || e._id)?.toString().toLowerCase() === target ||
-          e.slug?.toLowerCase() === target ||
+      memoryStore.events.find((e) => {
+        const eventId = (e.id || e._id)?.toString().toLowerCase();
+        const eventSlug = e.slug?.toLowerCase();
+
+        return (
+          eventId === target ||
+          eventSlug === target ||
           (isBeachTarget &&
-            (e.slug?.toLowerCase() ===
-              "burna-boy-live-no-sign-of-weakness-tour" ||
-              (e.id || e._id)?.toString() === "6ad685c5b93e2a37ef3dd857")),
-      ) || null
+            (eventSlug === beachFallbackSlug || eventId === beachFallbackId))
+        );
+      }) || null
     );
   },
 
