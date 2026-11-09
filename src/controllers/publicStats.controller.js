@@ -67,10 +67,31 @@ class PublicStatsController {
       const eId = event._id || event.id;
       let ticketsSold = 0;
 
+      // Extract defined tiers from event
+      const eventTiers = (event.ticketTiers || []).map((t) => ({
+        id: (t._id || t.id)?.toString(),
+        name: t.name || "General Admission",
+        sold: Number(t.sold) || 0,
+        capacity: Number(t.capacity) || 0,
+      }));
+
+      // Map tier name to breakdown entry
+      const tierMap = new Map();
+      eventTiers.forEach((t) => {
+        tierMap.set(t.name, {
+          name: t.name,
+          id: t.id,
+          sold: t.sold,
+          capacity: t.capacity,
+        });
+      });
+
       if (isDbConnected() && mongoose.Types.ObjectId.isValid(eId)) {
         try {
           const matchId = new mongoose.Types.ObjectId(eId);
-          const result = await Order.aggregate([
+
+          // Total order quantity count
+          const totalResult = await Order.aggregate([
             {
               $match: {
                 eventId: matchId,
@@ -85,21 +106,104 @@ class PublicStatsController {
             },
           ]);
 
-          ticketsSold = result[0]?.totalSold || 0;
+          ticketsSold = totalResult[0]?.totalSold || 0;
 
-          // If no orders matched via aggregation, check confirmed tickets
-          if (ticketsSold === 0) {
-            const ticketCount = await Ticket.countDocuments({
-              eventId: matchId,
-              status: { $in: ["valid", "used"] },
-              isDemo: { $ne: true },
-            });
-            if (ticketCount > 0) {
-              ticketsSold = ticketCount;
+          // Breakdown by tier from Orders
+          const orderTierResult = await Order.aggregate([
+            {
+              $match: {
+                eventId: matchId,
+                status: "success",
+              },
+            },
+            {
+              $group: {
+                _id: "$tierId",
+                sold: { $sum: "$quantity" },
+              },
+            },
+          ]);
+
+          // Breakdown by tier from confirmed Tickets
+          const ticketTierResult = await Ticket.aggregate([
+            {
+              $match: {
+                eventId: matchId,
+                status: { $in: ["valid", "used"] },
+                isDemo: { $ne: true },
+              },
+            },
+            {
+              $group: {
+                _id: "$tierName",
+                tierId: { $first: "$tierId" },
+                sold: { $sum: 1 },
+              },
+            },
+          ]);
+
+          // Merge Order tier counts
+          for (const item of orderTierResult) {
+            const rawKey = String(item._id || "").trim();
+            const count = Number(item.sold) || 0;
+            if (!rawKey || count <= 0) continue;
+
+            const matchedTier = eventTiers.find(
+              (t) =>
+                t.id === rawKey ||
+                t.name.toLowerCase() === rawKey.toLowerCase(),
+            );
+
+            if (matchedTier) {
+              const cur = tierMap.get(matchedTier.name);
+              cur.sold = Math.max(cur.sold, count);
+            } else {
+              if (tierMap.has(rawKey)) {
+                const cur = tierMap.get(rawKey);
+                cur.sold = Math.max(cur.sold, count);
+              } else {
+                tierMap.set(rawKey, {
+                  name: rawKey,
+                  sold: count,
+                  capacity: 0,
+                });
+              }
+            }
+          }
+
+          // Merge Ticket tier counts
+          for (const item of ticketTierResult) {
+            const rawName = String(item._id || "").trim();
+            const count = Number(item.sold) || 0;
+            if (!rawName || count <= 0) continue;
+
+            const matchedTier = eventTiers.find(
+              (t) =>
+                t.name.toLowerCase() === rawName.toLowerCase() ||
+                (item.tierId && t.id === String(item.tierId)),
+            );
+
+            if (matchedTier) {
+              const cur = tierMap.get(matchedTier.name);
+              cur.sold = Math.max(cur.sold, count);
+            } else {
+              if (tierMap.has(rawName)) {
+                const cur = tierMap.get(rawName);
+                cur.sold = Math.max(cur.sold, count);
+              } else {
+                tierMap.set(rawName, {
+                  name: rawName,
+                  sold: count,
+                  capacity: 0,
+                });
+              }
             }
           }
         } catch (dbErr) {
-          logger.warn("Order aggregation failed, falling back to dataStore:", dbErr);
+          logger.warn(
+            "Tier aggregation failed, falling back to event document:",
+            dbErr,
+          );
         }
       }
 
@@ -107,7 +211,8 @@ class PublicStatsController {
       if (ticketsSold === 0) {
         const memOrders = (dataStore.memory.orders || []).filter(
           (o) =>
-            (o.eventId?.id || o.eventId)?._id?.toString() === eId?.toString() ||
+            (o.eventId?.id || o.eventId)?._id?.toString() ===
+              eId?.toString() ||
             (o.eventId?.id || o.eventId)?.toString() === eId?.toString(),
         );
         const paidOrders = memOrders.filter((o) => o.status === "success");
@@ -115,6 +220,24 @@ class PublicStatsController {
           (acc, curr) => acc + (Number(curr.quantity) || 1),
           0,
         );
+
+        paidOrders.forEach((o) => {
+          const matched = eventTiers.find(
+            (t) => t.id === String(o.tierId) || t.name === String(o.tierId),
+          );
+          const name = matched
+            ? matched.name
+            : o.tierName || "General Admission";
+          if (tierMap.has(name)) {
+            tierMap.get(name).sold += Number(o.quantity) || 1;
+          } else {
+            tierMap.set(name, {
+              name,
+              sold: Number(o.quantity) || 1,
+              capacity: 0,
+            });
+          }
+        });
 
         if (ticketsSold === 0) {
           const memTickets = (dataStore.memory.tickets || []).filter(
@@ -126,15 +249,37 @@ class PublicStatsController {
           );
           if (memTickets.length > 0) {
             ticketsSold = memTickets.length;
+            memTickets.forEach((t) => {
+              const name = t.tierName || "General Admission";
+              if (tierMap.has(name)) {
+                tierMap.get(name).sold += 1;
+              } else {
+                tierMap.set(name, { name, sold: 1, capacity: 0 });
+              }
+            });
           }
         }
       }
 
-      // Return ONLY eventName, ticketsSold, lastUpdated (strict data hygiene)
+      const sumTierSold = Array.from(tierMap.values()).reduce(
+        (sum, t) => sum + (t.sold || 0),
+        0,
+      );
+      if (ticketsSold === 0) ticketsSold = sumTierSold;
+      if (sumTierSold > ticketsSold) ticketsSold = sumTierSold;
+
+      const tierBreakdown = Array.from(tierMap.values()).map((t) => ({
+        name: t.name,
+        sold: Number(t.sold) || 0,
+        capacity: Number(t.capacity) || 0,
+      }));
+
+      // Return ONLY eventName, ticketsSold, tierBreakdown, lastUpdated (strict data hygiene)
       return res.status(200).json({
         success: true,
         eventName: event.title,
         ticketsSold: Number(ticketsSold) || 0,
+        tierBreakdown,
         lastUpdated: new Date().toISOString(),
       });
     } catch (error) {

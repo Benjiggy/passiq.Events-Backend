@@ -76,6 +76,7 @@ test("PublicStatsController rejects missing or incorrect token with 404", async 
   assert.equal(statusSent, 200);
   assert.equal(jsonSent.eventName, "Afrobeats Gala");
   assert.equal(typeof jsonSent.ticketsSold, "number");
+  assert.ok(Array.isArray(jsonSent.tierBreakdown));
   assert.ok(jsonSent.lastUpdated);
   // Ensure sensitive data is NOT returned
   assert.equal(jsonSent.revenue, undefined);
