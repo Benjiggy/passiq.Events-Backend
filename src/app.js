@@ -12,6 +12,9 @@ const swaggerSpec = require("./config/swagger");
 
 const app = express();
 
+// Trust reverse proxy headers from Render/Cloudflare so real client IPs are resolved
+app.set("trust proxy", 1);
+
 // Security Headers
 app.use(helmet());
 
@@ -69,12 +72,19 @@ app.use(cookieParser());
 // Static Uploads Serving
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Rate Limiter
+// Rate Limiter (trust proxy enabled so each client IP is tracked individually)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs
+  max: 10000, // generous limit per client IP
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
+  skip: (req) =>
+    req.path === "/health" ||
+    req.path === "/api/health" ||
+    req.path.startsWith("/uploads") ||
+    req.method === "OPTIONS" ||
+    process.env.NODE_ENV !== "production",
   message: {
     success: false,
     status: "error",
