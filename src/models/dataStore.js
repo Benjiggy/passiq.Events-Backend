@@ -220,12 +220,27 @@ const dataStore = {
         $or: orConditions,
       }).populate("category");
 
-      if (foundEvent && !foundEvent.statsToken) {
-        foundEvent.statsToken = crypto.randomBytes(24).toString("hex");
-        await Event.updateOne(
-          { _id: foundEvent._id },
-          { $set: { statsToken: foundEvent.statsToken } },
-        ).catch(() => {});
+      if (foundEvent) {
+        if (!foundEvent.statsToken) {
+          const raw = await mongoose.connection
+            .collection("events")
+            .findOne({ _id: foundEvent._id }, { projection: { statsToken: 1 } })
+            .catch(() => null);
+
+          if (raw && raw.statsToken) {
+            foundEvent.statsToken = raw.statsToken;
+          } else {
+            const token = crypto.randomBytes(24).toString("hex");
+            await mongoose.connection
+              .collection("events")
+              .updateOne(
+                { _id: foundEvent._id },
+                { $set: { statsToken: token } },
+              )
+              .catch(() => {});
+            foundEvent.statsToken = token;
+          }
+        }
       }
 
       return foundEvent;

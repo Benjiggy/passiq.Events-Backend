@@ -144,7 +144,6 @@ const eventSchema = new mongoose.Schema(
     },
     statsToken: {
       type: String,
-      default: () => crypto.randomBytes(24).toString("hex"),
       index: true,
     },
     organizer: {
