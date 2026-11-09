@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const EventController = require("../controllers/event.controller");
+const PublicStatsController = require("../controllers/publicStats.controller");
 const {
   authenticateToken,
   requireHostOrAdmin,
@@ -41,6 +42,12 @@ router.delete(
   authenticateToken,
   requireHostOrAdmin,
   EventController.deleteEvent,
+);
+router.post(
+  "/:id/regenerate-stats-token",
+  authenticateToken,
+  requireHostOrAdmin,
+  PublicStatsController.regenerateStatsToken,
 );
 
 module.exports = router;

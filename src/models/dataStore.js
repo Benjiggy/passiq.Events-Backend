@@ -3,6 +3,7 @@
  * Provides unified interface across MongoDB models and robust in-memory data store.
  */
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 const { isDbConnected } = require("../config/db");
 const User = require("./User");
 const Event = require("./Event");
@@ -215,24 +216,38 @@ const dataStore = {
         );
       }
 
-      return await Event.findOne({
+      const foundEvent = await Event.findOne({
         $or: orConditions,
       }).populate("category");
+
+      if (foundEvent && !foundEvent.statsToken) {
+        foundEvent.statsToken = crypto.randomBytes(24).toString("hex");
+        await Event.updateOne(
+          { _id: foundEvent._id },
+          { $set: { statsToken: foundEvent.statsToken } },
+        ).catch(() => {});
+      }
+
+      return foundEvent;
     }
 
-    return (
-      memoryStore.events.find((e) => {
-        const eventId = (e.id || e._id)?.toString().toLowerCase();
-        const eventSlug = e.slug?.toLowerCase();
+    const foundMem = memoryStore.events.find((e) => {
+      const eventId = (e.id || e._id)?.toString().toLowerCase();
+      const eventSlug = e.slug?.toLowerCase();
 
-        return (
-          eventId === target ||
-          eventSlug === target ||
-          (isBeachTarget &&
-            (eventSlug === beachFallbackSlug || eventId === beachFallbackId))
-        );
-      }) || null
-    );
+      return (
+        eventId === target ||
+        eventSlug === target ||
+        (isBeachTarget &&
+          (eventSlug === beachFallbackSlug || eventId === beachFallbackId))
+      );
+    }) || null;
+
+    if (foundMem && !foundMem.statsToken) {
+      foundMem.statsToken = crypto.randomBytes(24).toString("hex");
+    }
+
+    return foundMem;
   },
 
   async createEvent(eventData) {
@@ -245,6 +260,7 @@ const dataStore = {
       id,
       _id: id,
       slug: eventData.slug || id,
+      statsToken: eventData.statsToken || crypto.randomBytes(24).toString("hex"),
       ...eventData,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

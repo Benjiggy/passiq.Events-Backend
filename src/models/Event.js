@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
+const crypto = require("crypto");
 
 const ticketTierSchema = new mongoose.Schema(
   {
@@ -140,6 +141,11 @@ const eventSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    statsToken: {
+      type: String,
+      default: () => crypto.randomBytes(24).toString("hex"),
+      index: true,
     },
     organizer: {
       name: { type: String, default: "Passiq Organizer" },
@@ -333,6 +339,10 @@ const eventSchema = new mongoose.Schema(
 );
 
 eventSchema.pre("validate", async function () {
+  if (!this.statsToken) {
+    this.statsToken = crypto.randomBytes(24).toString("hex");
+  }
+
   if (!this.isModified("title") && this.slug) return;
 
   const base = slugify(this.title, { lower: true, strict: true });
