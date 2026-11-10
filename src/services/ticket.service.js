@@ -22,17 +22,21 @@ class TicketService {
     const issuedTickets = [];
 
     for (let i = 0; i < order.quantity; i++) {
+      // Cryptographically random unique code (min 12 chars)
+      const randomHex = crypto.randomBytes(6).toString("hex").toUpperCase();
+      const code = `PQ-${randomHex}`;
       const ticketCode = generateTicketCode(event.slug || event.id, i + 1);
 
       // Scannable URL that opens the verified ticket pass directly when scanned with phone camera
-      const qrScanUrl = `${frontendBase}/payment/callback?reference=${encodeURIComponent(order.reference)}&ticket=${encodeURIComponent(ticketCode)}`;
+      const qrScanUrl = `${frontendBase}/payment/callback?reference=${encodeURIComponent(order.reference)}&ticket=${encodeURIComponent(code)}`;
       const qrDataUrl = await QrService.generateQrCodeDataUrl(qrScanUrl);
 
       // Save a permanent QR code PNG image to disk
-      await QrService.saveQrCodeToDisk(qrScanUrl, `qr_${ticketCode}.png`);
+      await QrService.saveQrCodeToDisk(qrScanUrl, `qr_${code}.png`);
 
       const ticket = await dataStore.createTicket({
-        ticketCode,
+        code,
+        ticketCode: code,
         reference: order.reference,
         paymentReference: order.reference,
         qrToken: qrScanUrl,
@@ -47,8 +51,11 @@ class TicketService {
         eventImage: event.image || event.poster || "",
         tierImage: tier?.image || event.image || event.poster || "",
         tierName,
+        ticketType: tierName,
         userName: order.attendeeName,
+        holderName: order.attendeeName,
         userEmail: order.email,
+        holderEmail: order.email,
         userPhone: order.phone || "",
         unitPrice: order.unitAmountKobo
           ? order.unitAmountKobo / 100

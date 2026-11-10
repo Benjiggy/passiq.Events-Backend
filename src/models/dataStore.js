@@ -15,6 +15,7 @@ const Discount = require("./Discount");
 const Blog = require("./Blog");
 const Category = require("./Category");
 const { Memory, Newsletter } = require("./Memory");
+const Scan = require("./Scan");
 
 // In-Memory Storage Cache
 const memoryStore = {
@@ -29,6 +30,7 @@ const memoryStore = {
   categories: [],
   memories: [],
   newsletters: [],
+  scans: [],
 };
 
 const dataStore = {
@@ -689,6 +691,419 @@ const dataStore = {
     memoryStore.newsletters.push(sub);
     return sub;
   },
+
+  // Check-in & Scanner Operations
+  async atomicScanTicket({ code, eventId, operator = 'Scanner', scannerLabel = 'Main Gate', ip = '' }) {
+    const cleanCode = String(code || '').trim().toUpperCase();
+    const cleanEventId = eventId && eventId !== 'all' ? eventId.toString() : null;
+
+    if (isDbConnected()) {
+      // 1. ATOMIC findOneAndUpdate guarantees only one scan succeeds
+      const query = {
+        $or: [{ code: cleanCode }, { ticketCode: cleanCode }],
+        status: 'valid'
+      };
+      if (cleanEventId) {
+        query.eventId = cleanEventId;
+      }
+
+      const updatedDoc = await Ticket.findOneAndUpdate(
+        query,
+        {
+          $set: {
+            status: 'used',
+            usedAt: new Date(),
+            checkedInAt: new Date(),
+            usedBy: operator,
+            checkedInBy: operator
+          }
+        },
+        { new: true }
+      ).populate('eventId');
+
+      if (updatedDoc) {
+        const eventName = updatedDoc.eventId?.title || updatedDoc.eventTitle || 'Event';
+        const scan = await Scan.create({
+          ticketId: updatedDoc._id,
+          code: cleanCode,
+          eventId: updatedDoc.eventId?._id || updatedDoc.eventId,
+          result: 'success',
+          scannedAt: new Date(),
+          operator,
+          scannerLabel,
+          ip,
+          holderName: updatedDoc.holderName || updatedDoc.userName,
+          holderEmail: updatedDoc.holderEmail || updatedDoc.userEmail,
+          ticketType: updatedDoc.ticketType || updatedDoc.tierName,
+          eventTitle: eventName,
+          firstScanAt: updatedDoc.usedAt || updatedDoc.checkedInAt
+        });
+
+        return {
+          result: 'success',
+          status: 'valid',
+          message: 'Valid ticket pass.',
+          attendeeName: updatedDoc.holderName || updatedDoc.userName,
+          attendeeEmail: updatedDoc.holderEmail || updatedDoc.userEmail,
+          ticketType: updatedDoc.ticketType || updatedDoc.tierName,
+          eventTitle: eventName,
+          scannedAt: scan.scannedAt,
+          ticketId: updatedDoc._id,
+          scan
+        };
+      }
+
+      // If atomic update returned null, inspect the ticket to determine exact state
+      const existingTicket = await Ticket.findOne({
+        $or: [{ code: cleanCode }, { ticketCode: cleanCode }]
+      }).populate('eventId');
+
+      if (!existingTicket) {
+        const scan = await Scan.create({
+          code: cleanCode,
+          eventId: cleanEventId || null,
+          result: 'invalid',
+          scannedAt: new Date(),
+          operator,
+          scannerLabel,
+          ip
+        });
+        return {
+          result: 'invalid',
+          status: 'invalid',
+          message: 'Unknown or invalid ticket code.',
+          scan
+        };
+      }
+
+      const tktEventId = (existingTicket.eventId?._id || existingTicket.eventId)?.toString();
+      if (cleanEventId && tktEventId !== cleanEventId) {
+        const scan = await Scan.create({
+          ticketId: existingTicket._id,
+          code: cleanCode,
+          eventId: cleanEventId,
+          result: 'invalid',
+          scannedAt: new Date(),
+          operator,
+          scannerLabel,
+          ip,
+          holderName: existingTicket.holderName || existingTicket.userName,
+          holderEmail: existingTicket.holderEmail || existingTicket.userEmail,
+          ticketType: existingTicket.ticketType || existingTicket.tierName,
+          eventTitle: existingTicket.eventId?.title || existingTicket.eventTitle
+        });
+        return {
+          result: 'invalid',
+          status: 'invalid',
+          message: `Ticket is registered for a different event (${existingTicket.eventId?.title || 'Another Event'}).`,
+          scan
+        };
+      }
+
+      if (existingTicket.status === 'used') {
+        const scan = await Scan.create({
+          ticketId: existingTicket._id,
+          code: cleanCode,
+          eventId: existingTicket.eventId?._id || existingTicket.eventId,
+          result: 'duplicate',
+          scannedAt: new Date(),
+          operator,
+          scannerLabel,
+          ip,
+          holderName: existingTicket.holderName || existingTicket.userName,
+          holderEmail: existingTicket.holderEmail || existingTicket.userEmail,
+          ticketType: existingTicket.ticketType || existingTicket.tierName,
+          eventTitle: existingTicket.eventId?.title || existingTicket.eventTitle,
+          firstScanAt: existingTicket.usedAt || existingTicket.checkedInAt
+        });
+        return {
+          result: 'duplicate',
+          status: 'used',
+          message: 'Ticket already used.',
+          attendeeName: existingTicket.holderName || existingTicket.userName,
+          attendeeEmail: existingTicket.holderEmail || existingTicket.userEmail,
+          ticketType: existingTicket.ticketType || existingTicket.tierName,
+          eventTitle: existingTicket.eventId?.title || existingTicket.eventTitle,
+          usedAt: existingTicket.usedAt || existingTicket.checkedInAt,
+          scan
+        };
+      }
+
+      if (existingTicket.status === 'void' || existingTicket.status === 'revoked') {
+        const scan = await Scan.create({
+          ticketId: existingTicket._id,
+          code: cleanCode,
+          eventId: existingTicket.eventId?._id || existingTicket.eventId,
+          result: 'void',
+          scannedAt: new Date(),
+          operator,
+          scannerLabel,
+          ip,
+          holderName: existingTicket.holderName || existingTicket.userName,
+          holderEmail: existingTicket.holderEmail || existingTicket.userEmail,
+          ticketType: existingTicket.ticketType || existingTicket.tierName,
+          eventTitle: existingTicket.eventId?.title || existingTicket.eventTitle
+        });
+        return {
+          result: 'void',
+          status: 'void',
+          message: 'Ticket has been voided or revoked.',
+          attendeeName: existingTicket.holderName || existingTicket.userName,
+          attendeeEmail: existingTicket.holderEmail || existingTicket.userEmail,
+          ticketType: existingTicket.ticketType || existingTicket.tierName,
+          scan
+        };
+      }
+
+      return {
+        result: 'invalid',
+        status: 'invalid',
+        message: 'Ticket status is invalid for entry.'
+      };
+    }
+
+    // In-memory fallback
+    const matchIndex = memoryStore.tickets.findIndex(t => {
+      const codeMatch = (t.code?.toUpperCase() === cleanCode || t.ticketCode?.toUpperCase() === cleanCode);
+      const eventMatch = !cleanEventId || (t.eventId?._id || t.eventId)?.toString() === cleanEventId;
+      return codeMatch && eventMatch && t.status === 'valid';
+    });
+
+    if (matchIndex !== -1) {
+      const t = memoryStore.tickets[matchIndex];
+      t.status = 'used';
+      t.usedAt = new Date();
+      t.checkedInAt = t.usedAt;
+      t.usedBy = operator;
+      t.checkedInBy = operator;
+
+      const scan = {
+        id: `scan_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        ticketId: t.id || t._id,
+        code: cleanCode,
+        eventId: t.eventId?._id || t.eventId,
+        result: 'success',
+        scannedAt: new Date().toISOString(),
+        operator,
+        scannerLabel,
+        ip,
+        holderName: t.holderName || t.userName,
+        holderEmail: t.holderEmail || t.userEmail,
+        ticketType: t.ticketType || t.tierName,
+        eventTitle: t.eventTitle,
+        firstScanAt: t.usedAt
+      };
+      memoryStore.scans.push(scan);
+
+      return {
+        result: 'success',
+        status: 'valid',
+        message: 'Valid ticket pass.',
+        attendeeName: t.holderName || t.userName,
+        attendeeEmail: t.holderEmail || t.userEmail,
+        ticketType: t.ticketType || t.tierName,
+        eventTitle: t.eventTitle,
+        scannedAt: scan.scannedAt,
+        ticketId: t.id || t._id,
+        scan
+      };
+    }
+
+    const existingTkt = memoryStore.tickets.find(t => 
+      t.code?.toUpperCase() === cleanCode || t.ticketCode?.toUpperCase() === cleanCode
+    );
+
+    if (!existingTkt) {
+      const scan = {
+        id: `scan_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        code: cleanCode,
+        eventId: cleanEventId,
+        result: 'invalid',
+        scannedAt: new Date().toISOString(),
+        operator,
+        scannerLabel,
+        ip
+      };
+      memoryStore.scans.push(scan);
+      return { result: 'invalid', status: 'invalid', message: 'Unknown or invalid ticket code.', scan };
+    }
+
+    const tktEvId = (existingTkt.eventId?._id || existingTkt.eventId)?.toString();
+    if (cleanEventId && tktEvId !== cleanEventId) {
+      const scan = {
+        id: `scan_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        ticketId: existingTkt.id || existingTkt._id,
+        code: cleanCode,
+        eventId: cleanEventId,
+        result: 'invalid',
+        scannedAt: new Date().toISOString(),
+        operator,
+        scannerLabel,
+        ip,
+        holderName: existingTkt.holderName || existingTkt.userName,
+        holderEmail: existingTkt.holderEmail || existingTkt.userEmail,
+        ticketType: existingTkt.ticketType || existingTkt.tierName,
+        eventTitle: existingTkt.eventTitle
+      };
+      memoryStore.scans.push(scan);
+      return {
+        result: 'invalid',
+        status: 'invalid',
+        message: 'Ticket is registered for a different event.',
+        scan
+      };
+    }
+
+    if (existingTkt.status === 'used') {
+      const scan = {
+        id: `scan_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        ticketId: existingTkt.id || existingTkt._id,
+        code: cleanCode,
+        eventId: existingTkt.eventId?._id || existingTkt.eventId,
+        result: 'duplicate',
+        scannedAt: new Date().toISOString(),
+        operator,
+        scannerLabel,
+        ip,
+        holderName: existingTkt.holderName || existingTkt.userName,
+        holderEmail: existingTkt.holderEmail || existingTkt.userEmail,
+        ticketType: existingTkt.ticketType || existingTkt.tierName,
+        eventTitle: existingTkt.eventTitle,
+        firstScanAt: existingTkt.usedAt || existingTkt.checkedInAt
+      };
+      memoryStore.scans.push(scan);
+      return {
+        result: 'duplicate',
+        status: 'used',
+        message: 'Ticket already used.',
+        attendeeName: existingTkt.holderName || existingTkt.userName,
+        attendeeEmail: existingTkt.holderEmail || existingTkt.userEmail,
+        ticketType: existingTkt.ticketType || existingTkt.tierName,
+        eventTitle: existingTkt.eventTitle,
+        usedAt: existingTkt.usedAt || existingTkt.checkedInAt,
+        scan
+      };
+    }
+
+    const scan = {
+      id: `scan_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      ticketId: existingTkt.id || existingTkt._id,
+      code: cleanCode,
+      eventId: existingTkt.eventId?._id || existingTkt.eventId,
+      result: existingTkt.status === 'void' ? 'void' : 'invalid',
+      scannedAt: new Date().toISOString(),
+      operator,
+      scannerLabel,
+      ip,
+      holderName: existingTkt.holderName || existingTkt.userName,
+      holderEmail: existingTkt.holderEmail || existingTkt.userEmail,
+      ticketType: existingTkt.ticketType || existingTkt.tierName,
+      eventTitle: existingTkt.eventTitle
+    };
+    memoryStore.scans.push(scan);
+    return {
+      result: existingTkt.status === 'void' ? 'void' : 'invalid',
+      status: existingTkt.status,
+      message: existingTkt.status === 'void' ? 'Ticket has been voided.' : 'Invalid ticket status.',
+      attendeeName: existingTkt.holderName || existingTkt.userName,
+      attendeeEmail: existingTkt.holderEmail || existingTkt.userEmail,
+      ticketType: existingTkt.ticketType || existingTkt.tierName,
+      scan
+    };
+  },
+
+  async listRecentScans(eventId, limit = 10) {
+    const cleanEventId = eventId && eventId !== 'all' ? eventId.toString() : null;
+    const lim = parseInt(limit, 10) || 10;
+    if (isDbConnected()) {
+      const filter = cleanEventId ? { eventId: cleanEventId } : {};
+      return await Scan.find(filter).sort({ scannedAt: -1 }).limit(lim);
+    }
+    let scans = [...memoryStore.scans];
+    if (cleanEventId) {
+      scans = scans.filter(s => (s.eventId?._id || s.eventId)?.toString() === cleanEventId);
+    }
+    scans.sort((a, b) => new Date(b.scannedAt) - new Date(a.scannedAt));
+    return scans.slice(0, lim);
+  },
+
+  async getCheckinStats(eventId) {
+    const cleanEventId = eventId && eventId !== 'all' ? eventId.toString() : null;
+    if (isDbConnected()) {
+      const filter = cleanEventId ? { eventId: cleanEventId } : {};
+      const total = await Ticket.countDocuments({ ...filter, status: { $in: ['valid', 'used'] } });
+      const scanned = await Ticket.countDocuments({ ...filter, status: 'used' });
+      const remaining = Math.max(0, total - scanned);
+      return { scanned, total, remaining };
+    }
+    const tickets = cleanEventId
+      ? memoryStore.tickets.filter(t => (t.eventId?._id || t.eventId)?.toString() === cleanEventId)
+      : memoryStore.tickets;
+    const total = tickets.filter(t => ['valid', 'used'].includes(t.status)).length;
+    const scanned = tickets.filter(t => t.status === 'used').length;
+    const remaining = Math.max(0, total - scanned);
+    return { scanned, total, remaining };
+  },
+
+  async listAllScans({ eventId, result, search, page = 1, limit = 20 }) {
+    const p = Math.max(1, parseInt(page, 10) || 1);
+    const l = Math.max(1, parseInt(limit, 10) || 20);
+    const skip = (p - 1) * l;
+    const cleanEventId = eventId && eventId !== 'all' ? eventId.toString() : null;
+
+    if (isDbConnected()) {
+      const query = {};
+      if (cleanEventId) query.eventId = cleanEventId;
+      if (result && result !== 'all') query.result = result;
+      if (search) {
+        const regex = new RegExp(search.trim(), 'i');
+        query.$or = [
+          { code: regex },
+          { holderName: regex },
+          { holderEmail: regex },
+          { ticketType: regex },
+          { operator: regex }
+        ];
+      }
+      const [scans, totalCount] = await Promise.all([
+        Scan.find(query).sort({ scannedAt: -1 }).skip(skip).limit(l),
+        Scan.countDocuments(query)
+      ]);
+      return {
+        scans,
+        totalCount,
+        page: p,
+        totalPages: Math.ceil(totalCount / l) || 1
+      };
+    }
+
+    let filtered = [...memoryStore.scans];
+    if (cleanEventId) {
+      filtered = filtered.filter(s => (s.eventId?._id || s.eventId)?.toString() === cleanEventId);
+    }
+    if (result && result !== 'all') {
+      filtered = filtered.filter(s => s.result === result);
+    }
+    if (search) {
+      const term = search.toLowerCase().trim();
+      filtered = filtered.filter(s =>
+        s.code?.toLowerCase().includes(term) ||
+        s.holderName?.toLowerCase().includes(term) ||
+        s.holderEmail?.toLowerCase().includes(term) ||
+        s.ticketType?.toLowerCase().includes(term) ||
+        s.operator?.toLowerCase().includes(term)
+      );
+    }
+    filtered.sort((a, b) => new Date(b.scannedAt) - new Date(a.scannedAt));
+    const totalCount = filtered.length;
+    const scans = filtered.slice(skip, skip + l);
+    return {
+      scans,
+      totalCount,
+      page: p,
+      totalPages: Math.ceil(totalCount / l) || 1
+    };
+  }
 };
 
 module.exports = dataStore;

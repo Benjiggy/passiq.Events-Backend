@@ -128,10 +128,27 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+/**
+ * Staff, Scanner, Host, or Admin Check
+ */
+const requireStaffOrAdmin = (req, res, next) => {
+  if (!req.user) {
+    return ApiResponse.error(res, 'Authentication required.', 401);
+  }
+
+  const role = req.user.role || req.user.accountType || 'attendee';
+  if (!['admin', 'host', 'staff', 'scanner'].includes(role)) {
+    return ApiResponse.error(res, 'Staff or administrator capability required.', 403);
+  }
+
+  next();
+};
+
 module.exports = {
   authenticateToken,
   optionalAuth,
   requireRole,
   requireHostOrAdmin,
-  requireAdmin
+  requireAdmin,
+  requireStaffOrAdmin
 };

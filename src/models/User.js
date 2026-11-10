@@ -23,12 +23,12 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['attendee', 'host', 'admin'],
+      enum: ['attendee', 'host', 'admin', 'staff', 'scanner'],
       default: 'attendee'
     },
     accountType: {
       type: String,
-      enum: ['attendee', 'host', 'admin'],
+      enum: ['attendee', 'host', 'admin', 'staff', 'scanner'],
       default: 'attendee'
     },
     phone: {

@@ -15,6 +15,7 @@ const newsletterRoutes = require("./newsletter.routes");
 const adminRoutes = require("./admin.routes");
 const categoryRoutes = require("./category.routes");
 const publicRoutes = require("./public.routes");
+const checkinRoutes = require("./checkin.routes");
 
 // Health Check
 router.get("/health", (req, res) => {
@@ -42,5 +43,6 @@ router.use("/newsletter", newsletterRoutes);
 router.use("/admin", adminRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/public", publicRoutes);
+router.use("/checkin", checkinRoutes);
 
 module.exports = router;
