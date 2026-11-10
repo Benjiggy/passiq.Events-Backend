@@ -25,11 +25,19 @@ class AdminController {
       const users = await dataStore.listUsers();
       const events = await dataStore.listEvents();
 
+      function toId(val) {
+        if (!val) return "";
+        if (typeof val === "string") return val;
+        if (val._id) return val._id.toString();
+        if (typeof val.toHexString === "function") return val.toHexString();
+        return val.toString();
+      }
+
       const hosts = [];
 
       for (const user of users) {
-        const uId = (user.id || user._id)?.toString();
-        const userEvents = events.filter(e => (e.ownerId?.id || e.ownerId)?.toString() === uId);
+        const uId = toId(user.id || user._id);
+        const userEvents = events.filter(e => toId(e.ownerId) === uId);
 
         // Include users that are hosts/admins or have created events
         if (user.role === 'host' || user.role === 'admin' || userEvents.length > 0) {

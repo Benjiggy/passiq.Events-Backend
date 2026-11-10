@@ -86,17 +86,37 @@ class PublicStatsController {
         });
       });
 
+      const isMarlian =
+        /marlian/i.test(event.title || "") ||
+        eId?.toString() === "6ad8cdaa04730d435e513b1a" ||
+        event.slug === "marlians-fest";
+
       if (isDbConnected() && mongoose.Types.ObjectId.isValid(eId)) {
         try {
           const matchId = new mongoose.Types.ObjectId(eId);
+          const ownerMatchId =
+            event.ownerId && mongoose.Types.ObjectId.isValid(event.ownerId)
+              ? new mongoose.Types.ObjectId(event.ownerId)
+              : event.ownerId;
+
+          const orderMatch =
+            isMarlian && ownerMatchId
+              ? {
+                  $or: [
+                    { eventId: matchId },
+                    { ownerId: ownerMatchId },
+                  ],
+                  status: "success",
+                }
+              : {
+                  eventId: matchId,
+                  status: "success",
+                };
 
           // Total order quantity count
           const totalResult = await Order.aggregate([
             {
-              $match: {
-                eventId: matchId,
-                status: "success",
-              },
+              $match: orderMatch,
             },
             {
               $group: {
@@ -111,10 +131,7 @@ class PublicStatsController {
           // Breakdown by tier from Orders
           const orderTierResult = await Order.aggregate([
             {
-              $match: {
-                eventId: matchId,
-                status: "success",
-              },
+              $match: orderMatch,
             },
             {
               $group: {
