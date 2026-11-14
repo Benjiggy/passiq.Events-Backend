@@ -279,7 +279,7 @@ class PublicStatsController {
       }
 
       if (isMarlian) {
-        ticketsSold = 340;
+        ticketsSold = Math.max(340, ticketsSold);
       } else {
         const sumTierSold = Array.from(tierMap.values()).reduce(
           (sum, t) => sum + (t.sold || 0),
@@ -306,10 +306,10 @@ class PublicStatsController {
             sold = 13;
             capacity = 100;
           } else if (/regular\s*vip/i.test(t.name || "")) {
-            sold = 16;
+            sold = Math.max(16, sold);
             capacity = 2773;
           } else if (/regular/i.test(t.name || "")) {
-            sold = 26;
+            sold = Math.max(26, sold);
             capacity = 5000;
           }
         }
@@ -327,12 +327,46 @@ class PublicStatsController {
         };
       });
 
-      // Return ONLY eventName, ticketsSold, tierBreakdown, lastUpdated (strict data hygiene)
+      // Safe anonymized recent purchases for live sales tracker
+      let recentPurchases = [];
+      try {
+        if (isDbConnected() && mongoose.Types.ObjectId.isValid(eId)) {
+          const matchId = new mongoose.Types.ObjectId(eId);
+          const ownerMatchId = event.ownerId && mongoose.Types.ObjectId.isValid(event.ownerId)
+            ? new mongoose.Types.ObjectId(event.ownerId)
+            : null;
+          const orderMatch = isMarlian && ownerMatchId
+            ? { $or: [{ eventId: matchId }, { ownerId: ownerMatchId }], status: "success" }
+            : { eventId: matchId, status: "success" };
+
+          const recentOrders = await Order.find(orderMatch)
+            .sort({ createdAt: -1 })
+            .limit(6)
+            .select("tierId tierName quantity createdAt");
+
+          recentPurchases = recentOrders.map((o) => {
+            const matchedTier = eventTiers.find(
+              (t) => t.id === String(o.tierId) || t.name.toLowerCase() === String(o.tierId || "").toLowerCase()
+            );
+            return {
+              id: o._id?.toString(),
+              tierName: matchedTier ? matchedTier.name : o.tierName || "Regular",
+              quantity: Number(o.quantity) || 1,
+              createdAt: o.createdAt,
+            };
+          });
+        }
+      } catch (recErr) {
+        logger.warn("Recent purchases query failed:", recErr);
+      }
+
+      // Return ONLY eventName, ticketsSold, tierBreakdown, recentPurchases, lastUpdated (strict data hygiene)
       return res.status(200).json({
         success: true,
         eventName: event.title,
         ticketsSold: Number(ticketsSold) || 0,
         tierBreakdown,
+        recentPurchases,
         lastUpdated: new Date().toISOString(),
       });
     } catch (error) {
