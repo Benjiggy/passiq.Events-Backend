@@ -279,7 +279,7 @@ class PublicStatsController {
       }
 
       if (isMarlian) {
-        ticketsSold = Math.max(340, ticketsSold);
+        ticketsSold = 340;
       } else {
         const sumTierSold = Array.from(tierMap.values()).reduce(
           (sum, t) => sum + (t.sold || 0),
@@ -306,19 +306,21 @@ class PublicStatsController {
             sold = 13;
             capacity = 100;
           } else if (/regular\s*vip/i.test(t.name || "")) {
-            sold = Math.max(16, sold);
+            sold = 16;
             capacity = 2773;
           } else if (/regular/i.test(t.name || "")) {
-            sold = Math.max(26, sold);
+            sold = 26;
             capacity = 5000;
+          } else {
+            sold = 0;
+            capacity = Number(t.capacity) || 50;
           }
         }
-        const isSoldOut =
-          t.isSoldOut !== undefined
-            ? Boolean(t.isSoldOut)
-            : isMarlian && (isEarlyBirdReg || isEarlyBirdVip)
-            ? true
-            : Boolean(capacity > 0 && sold >= capacity);
+        const isSoldOut = isMarlian
+          ? Boolean(isEarlyBirdReg || isEarlyBirdVip)
+          : t.isSoldOut !== undefined
+          ? Boolean(t.isSoldOut)
+          : Boolean(capacity > 0 && sold >= capacity);
         return {
           name: t.name,
           sold,
