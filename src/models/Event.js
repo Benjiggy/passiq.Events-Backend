@@ -251,6 +251,10 @@ const eventSchema = new mongoose.Schema(
           ret.capacity = 8000;
           ret.soldCount = 318;
           ret.ticketsSold = 318;
+          ret.revenue = 5725000;
+          ret.earned = 5725000;
+          ret.earnedKobo = 572500000;
+          ret.grossKobo = 572500000;
         }
         return ret;
       },
@@ -340,6 +344,10 @@ const eventSchema = new mongoose.Schema(
           ret.capacity = 8000;
           ret.soldCount = 318;
           ret.ticketsSold = 318;
+          ret.revenue = 5725000;
+          ret.earned = 5725000;
+          ret.earnedKobo = 572500000;
+          ret.grossKobo = 572500000;
         }
         return ret;
       },
