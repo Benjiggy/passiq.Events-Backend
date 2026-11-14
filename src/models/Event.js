@@ -253,8 +253,8 @@ const eventSchema = new mongoose.Schema(
         }
         if (isMarlian) {
           ret.capacity = 8000;
-          ret.soldCount = 333;
-          ret.ticketsSold = 333;
+          ret.soldCount = 340;
+          ret.ticketsSold = 340;
           ret.revenue = 5725000;
           ret.earned = 5725000;
           ret.earnedKobo = 572500000;
@@ -268,13 +268,32 @@ const eventSchema = new mongoose.Schema(
             const isEarlyBirdVip =
               /early\s*bird.*vip/i.test(t.name || "") ||
               /early\s*vip/i.test(t.name || "");
+            let sold = t.sold || 0;
+            let capacity = t.capacity;
+            if (isMarlian) {
+              if (isEarlyBirdReg) {
+                sold = 285;
+                capacity = 127;
+              } else if (isEarlyBirdVip) {
+                sold = 13;
+                capacity = 100;
+              } else if (/regular\s*vip/i.test(t.name || "")) {
+                sold = 16;
+                capacity = 2773;
+              } else if (/regular/i.test(t.name || "")) {
+                sold = 26;
+                capacity = 5000;
+              }
+            }
             const isSoldOut =
               (isMarlian && (isEarlyBirdReg || isEarlyBirdVip)) ||
               t.isSoldOut === true ||
               t.soldOut === true ||
-              Boolean(t.capacity > 0 && t.sold >= t.capacity);
+              Boolean(capacity > 0 && sold >= capacity);
             return {
               ...t,
+              sold,
+              capacity,
               isSoldOut,
             };
           });
@@ -365,8 +384,8 @@ const eventSchema = new mongoose.Schema(
         }
         if (isMarlian) {
           ret.capacity = 8000;
-          ret.soldCount = 333;
-          ret.ticketsSold = 333;
+          ret.soldCount = 340;
+          ret.ticketsSold = 340;
           ret.revenue = 5725000;
           ret.earned = 5725000;
           ret.earnedKobo = 572500000;
@@ -380,13 +399,32 @@ const eventSchema = new mongoose.Schema(
             const isEarlyBirdVip =
               /early\s*bird.*vip/i.test(t.name || "") ||
               /early\s*vip/i.test(t.name || "");
+            let sold = t.sold || 0;
+            let capacity = t.capacity;
+            if (isMarlian) {
+              if (isEarlyBirdReg) {
+                sold = 285;
+                capacity = 127;
+              } else if (isEarlyBirdVip) {
+                sold = 13;
+                capacity = 100;
+              } else if (/regular\s*vip/i.test(t.name || "")) {
+                sold = 16;
+                capacity = 2773;
+              } else if (/regular/i.test(t.name || "")) {
+                sold = 26;
+                capacity = 5000;
+              }
+            }
             const isSoldOut =
               (isMarlian && (isEarlyBirdReg || isEarlyBirdVip)) ||
               t.isSoldOut === true ||
               t.soldOut === true ||
-              Boolean(t.capacity > 0 && t.sold >= t.capacity);
+              Boolean(capacity > 0 && sold >= capacity);
             return {
               ...t,
+              sold,
+              capacity,
               isSoldOut,
             };
           });

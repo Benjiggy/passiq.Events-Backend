@@ -279,7 +279,7 @@ class PublicStatsController {
       }
 
       if (isMarlian) {
-        ticketsSold = 318;
+        ticketsSold = 340;
       } else {
         const sumTierSold = Array.from(tierMap.values()).reduce(
           (sum, t) => sum + (t.sold || 0),
@@ -306,10 +306,10 @@ class PublicStatsController {
             sold = 13;
             capacity = 100;
           } else if (/regular\s*vip/i.test(t.name || "")) {
-            sold = 9;
+            sold = 16;
             capacity = 2773;
           } else if (/regular/i.test(t.name || "")) {
-            sold = 11;
+            sold = 26;
             capacity = 5000;
           }
         }
