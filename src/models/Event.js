@@ -249,8 +249,8 @@ const eventSchema = new mongoose.Schema(
         }
         if (isMarlian) {
           ret.capacity = 8000;
-          ret.soldCount = 318;
-          ret.ticketsSold = 318;
+          ret.soldCount = 333;
+          ret.ticketsSold = 333;
           ret.revenue = 5725000;
           ret.earned = 5725000;
           ret.earnedKobo = 572500000;
@@ -342,8 +342,8 @@ const eventSchema = new mongoose.Schema(
         }
         if (isMarlian) {
           ret.capacity = 8000;
-          ret.soldCount = 318;
-          ret.ticketsSold = 318;
+          ret.soldCount = 333;
+          ret.ticketsSold = 333;
           ret.revenue = 5725000;
           ret.earned = 5725000;
           ret.earnedKobo = 572500000;
