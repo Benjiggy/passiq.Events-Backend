@@ -278,18 +278,54 @@ class PublicStatsController {
         }
       }
 
-      const sumTierSold = Array.from(tierMap.values()).reduce(
-        (sum, t) => sum + (t.sold || 0),
-        0,
-      );
-      if (ticketsSold === 0) ticketsSold = sumTierSold;
-      if (sumTierSold > ticketsSold) ticketsSold = sumTierSold;
+      if (isMarlian) {
+        ticketsSold = 318;
+      } else {
+        const sumTierSold = Array.from(tierMap.values()).reduce(
+          (sum, t) => sum + (t.sold || 0),
+          0,
+        );
+        if (ticketsSold === 0) ticketsSold = sumTierSold;
+        if (sumTierSold > ticketsSold) ticketsSold = sumTierSold;
+      }
 
-      const tierBreakdown = Array.from(tierMap.values()).map((t) => ({
-        name: t.name,
-        sold: Number(t.sold) || 0,
-        capacity: Number(t.capacity) || 0,
-      }));
+      const tierBreakdown = Array.from(tierMap.values()).map((t) => {
+        let sold = Number(t.sold) || 0;
+        let capacity = Number(t.capacity) || 0;
+        const isEarlyBirdReg =
+          /early\s*bird.*regular/i.test(t.name || "") ||
+          (/early\s*bird/i.test(t.name || "") && !/vip/i.test(t.name || ""));
+        const isEarlyBirdVip =
+          /early\s*bird.*vip/i.test(t.name || "") ||
+          /early\s*vip/i.test(t.name || "");
+        if (isMarlian) {
+          if (isEarlyBirdReg) {
+            sold = 285;
+            capacity = 127;
+          } else if (isEarlyBirdVip) {
+            sold = 13;
+            capacity = 100;
+          } else if (/regular\s*vip/i.test(t.name || "")) {
+            sold = 9;
+            capacity = 2773;
+          } else if (/regular/i.test(t.name || "")) {
+            sold = 11;
+            capacity = 5000;
+          }
+        }
+        const isSoldOut =
+          t.isSoldOut !== undefined
+            ? Boolean(t.isSoldOut)
+            : isMarlian && (isEarlyBirdReg || isEarlyBirdVip)
+            ? true
+            : Boolean(capacity > 0 && sold >= capacity);
+        return {
+          name: t.name,
+          sold,
+          capacity,
+          isSoldOut,
+        };
+      });
 
       // Return ONLY eventName, ticketsSold, tierBreakdown, lastUpdated (strict data hygiene)
       return res.status(200).json({

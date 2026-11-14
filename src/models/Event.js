@@ -265,10 +265,13 @@ const eventSchema = new mongoose.Schema(
             const isEarlyBirdReg =
               /early\s*bird.*regular/i.test(t.name || "") ||
               (/early\s*bird/i.test(t.name || "") && !/vip/i.test(t.name || ""));
+            const isEarlyBirdVip =
+              /early\s*bird.*vip/i.test(t.name || "") ||
+              /early\s*vip/i.test(t.name || "");
             const isSoldOut =
               t.isSoldOut !== undefined
                 ? Boolean(t.isSoldOut)
-                : isMarlian && isEarlyBirdReg
+                : isMarlian && (isEarlyBirdReg || isEarlyBirdVip)
                 ? true
                 : Boolean(t.capacity > 0 && t.sold >= t.capacity);
             return {
@@ -375,10 +378,13 @@ const eventSchema = new mongoose.Schema(
             const isEarlyBirdReg =
               /early\s*bird.*regular/i.test(t.name || "") ||
               (/early\s*bird/i.test(t.name || "") && !/vip/i.test(t.name || ""));
+            const isEarlyBirdVip =
+              /early\s*bird.*vip/i.test(t.name || "") ||
+              /early\s*vip/i.test(t.name || "");
             const isSoldOut =
               t.isSoldOut !== undefined
                 ? Boolean(t.isSoldOut)
-                : isMarlian && isEarlyBirdReg
+                : isMarlian && (isEarlyBirdReg || isEarlyBirdVip)
                 ? true
                 : Boolean(t.capacity > 0 && t.sold >= t.capacity);
             return {
