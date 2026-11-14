@@ -247,6 +247,11 @@ const eventSchema = new mongoose.Schema(
             ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
           }
         }
+        if (isMarlian) {
+          ret.capacity = 8000;
+          ret.soldCount = 318;
+          ret.ticketsSold = 318;
+        }
         return ret;
       },
     },
@@ -330,6 +335,11 @@ const eventSchema = new mongoose.Schema(
           if (!ret.organizer.enquiries) {
             ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
           }
+        }
+        if (isMarlian) {
+          ret.capacity = 8000;
+          ret.soldCount = 318;
+          ret.ticketsSold = 318;
         }
         return ret;
       },
