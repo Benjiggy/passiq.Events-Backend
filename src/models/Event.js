@@ -27,6 +27,10 @@ const ticketTierSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    isSoldOut: {
+      type: Boolean,
+      default: false,
+    },
     description: {
       type: String,
       default: "",
@@ -256,6 +260,23 @@ const eventSchema = new mongoose.Schema(
           ret.earnedKobo = 572500000;
           ret.grossKobo = 572500000;
         }
+        if (Array.isArray(ret.ticketTiers)) {
+          ret.ticketTiers = ret.ticketTiers.map((t) => {
+            const isEarlyBirdReg =
+              /early\s*bird.*regular/i.test(t.name || "") ||
+              (/early\s*bird/i.test(t.name || "") && !/vip/i.test(t.name || ""));
+            const isSoldOut =
+              t.isSoldOut !== undefined
+                ? Boolean(t.isSoldOut)
+                : isMarlian && isEarlyBirdReg
+                ? true
+                : Boolean(t.capacity > 0 && t.sold >= t.capacity);
+            return {
+              ...t,
+              isSoldOut,
+            };
+          });
+        }
         return ret;
       },
     },
@@ -348,6 +369,23 @@ const eventSchema = new mongoose.Schema(
           ret.earned = 5725000;
           ret.earnedKobo = 572500000;
           ret.grossKobo = 572500000;
+        }
+        if (Array.isArray(ret.ticketTiers)) {
+          ret.ticketTiers = ret.ticketTiers.map((t) => {
+            const isEarlyBirdReg =
+              /early\s*bird.*regular/i.test(t.name || "") ||
+              (/early\s*bird/i.test(t.name || "") && !/vip/i.test(t.name || ""));
+            const isSoldOut =
+              t.isSoldOut !== undefined
+                ? Boolean(t.isSoldOut)
+                : isMarlian && isEarlyBirdReg
+                ? true
+                : Boolean(t.capacity > 0 && t.sold >= t.capacity);
+            return {
+              ...t,
+              isSoldOut,
+            };
+          });
         }
         return ret;
       },
