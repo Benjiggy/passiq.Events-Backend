@@ -67,9 +67,9 @@ const eventSchema = new mongoose.Schema(
     },
     category: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Category", // must match the model name you used in mongoose.model('Category', ...)
+      ref: "Category", // must match the model name used in mongoose.model('Category', ...)
       required: [true, "Category is required"],
-      index: true, // you'll likely filter events by category often
+      index: true,
     },
     date: {
       type: String, // YYYY-MM-DD
@@ -128,8 +128,9 @@ const eventSchema = new mongoose.Schema(
       default: "",
     },
     status: {
+      // "ended" is included because the dashboard offers it as a status option
       type: String,
-      enum: ["draft", "published", "cancelled", "completed"],
+      enum: ["draft", "published", "ended", "cancelled", "completed"],
       default: "published",
     },
     completionStatus: {
@@ -141,10 +142,17 @@ const eventSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Stored flag for events that are announced but not yet on sale.
+    // The API derives isClickable / priceDisplay / displayDate from it.
+    comingSoon: {
+      type: Boolean,
+      default: false,
+    },
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
     statsToken: {
       type: String,
@@ -157,6 +165,11 @@ const eventSchema = new mongoose.Schema(
       phone: { type: String, default: "" },
       avatar: { type: String, default: "" },
       verified: { type: Boolean, default: true },
+      // Editable from the dashboard, so they must live in the schema.
+      // Without these fields Mongoose silently drops them on save.
+      partner: { type: String, default: "" },
+      officialPartner: { type: String, default: "" },
+      enquiries: { type: String, default: "" },
     },
     directions: {
       venueName: String,
@@ -170,279 +183,102 @@ const eventSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    toJSON: {
-      transform: (doc, ret) => {
-        ret.id = ret._id;
-        delete ret._id;
-        delete ret.__v;
-        if (ret.category && typeof ret.category === "object" && ret.category.name) {
-          ret.categoryName = ret.category.name;
-          ret.category =
-            ret.category.name.toLowerCase() === "music & concerts"
-              ? "Music & Concerts"
-              : ret.category.name;
-        } else if (ret.category && String(ret.category) === "6ad3dbd83ca63b1d2ed0db41") {
-          ret.category = "Music & Concerts";
-        }
-        const rawTitle = ret.title || "";
-        const isBurna =
-          /burna\s*boy/i.test(rawTitle) ||
-          /weakness/i.test(rawTitle) ||
-          String(ret.id || ret._id) === "6ad685c5b93e2a37ef3dd857" ||
-          ret.slug === "burna-boy-live-no-sign-of-weakness-tour";
-
-        const isMarlian =
-          /marlian/i.test(rawTitle) ||
-          String(ret.id || ret._id) === "6ad8cdaa04730d435e513b1a";
-
-        const isWetParty =
-          /wet\s*party/i.test(rawTitle) ||
-          String(ret.id || ret._id) === "event-wet-party-coming-soon";
-
-        if (isBurna) {
-          ret.title = "Beach Vibez and Music: Guest Artist Invited.";
-          ret.subtitle = "Beach Vibez & Music with special guest artists invited live at Landmark Beach.";
-          ret.description = "Experience an unforgettable beach party with high-energy live music, seaside chill vibes, and special guest artist performances at Landmark Beach Arena, Victoria Island.";
-          ret.isClickable = false;
-          ret.comingSoon = true;
-          ret.priceDisplay = "Coming Soon";
-          ret.displayDate = "Coming Soon";
-          ret.formattedDate = "Coming Soon";
-          ret.organizer = ret.organizer || {};
-          ret.organizer.name = "Passiq Events";
-          ret.organizer.handle = "Admin-Passiq";
-          ret.organizer.avatar = "/passiq-logo.png";
-          ret.organizer.verified = true;
-          ret.organizer.partner = "";
-          ret.organizer.officialPartner = "";
-          ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
-        } else if (isWetParty) {
-          ret.isClickable = false;
-          ret.comingSoon = true;
-          ret.priceDisplay = "Coming Soon";
-          ret.displayDate = "Coming Soon";
-          ret.formattedDate = "Coming Soon";
-          ret.organizer = ret.organizer || {};
-          ret.organizer.name = "Passiq Events";
-          ret.organizer.handle = "Admin-Passiq";
-          ret.organizer.avatar = "/passiq-logo.png";
-          ret.organizer.verified = true;
-          ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
-        } else if (
-          ret.organizer &&
-          (isMarlian ||
-            ret.organizer.name === "agborex" ||
-            !ret.organizer.name ||
-            ret.organizer.name.includes("Sample"))
-        ) {
-          ret.organizer.name = "House Of Naya";
-          if (
-            !ret.organizer.handle ||
-            ret.organizer.handle === "organizer" ||
-            ret.organizer.handle.includes("sample")
-          ) {
-            ret.organizer.handle = "Admin-House Of Naya";
-          }
-          if (!ret.organizer.partner) {
-            ret.organizer.partner = "KRD (Kelvin Records)";
-            ret.organizer.officialPartner = "KRD (Kelvin Records)";
-          }
-          if (!ret.organizer.enquiries) {
-            ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
-          }
-        }
-        if (isMarlian) {
-          ret.capacity = 8000;
-          ret.soldCount = 340;
-          ret.ticketsSold = 340;
-          ret.revenue = 5725000;
-          ret.earned = 5725000;
-          ret.earnedKobo = 572500000;
-          ret.grossKobo = 572500000;
-        }
-        if (Array.isArray(ret.ticketTiers)) {
-          ret.ticketTiers = ret.ticketTiers.map((t) => {
-            const isEarlyBirdReg =
-              /early\s*bird.*regular/i.test(t.name || "") ||
-              (/early\s*bird/i.test(t.name || "") && !/vip/i.test(t.name || ""));
-            const isEarlyBirdVip =
-              /early\s*bird.*vip/i.test(t.name || "") ||
-              /early\s*vip/i.test(t.name || "");
-            let sold = t.sold || 0;
-            let capacity = t.capacity;
-            if (isMarlian) {
-              if (isEarlyBirdReg) {
-                sold = 285;
-                capacity = 127;
-              } else if (isEarlyBirdVip) {
-                sold = 13;
-                capacity = 100;
-              } else if (/regular\s*vip/i.test(t.name || "")) {
-                sold = 16;
-                capacity = 2773;
-              } else if (/regular/i.test(t.name || "")) {
-                sold = 26;
-                capacity = 5000;
-              }
-            }
-            const isSoldOut =
-              (isMarlian && (isEarlyBirdReg || isEarlyBirdVip)) ||
-              t.isSoldOut === true ||
-              t.soldOut === true ||
-              Boolean(capacity > 0 && sold >= capacity);
-            return {
-              ...t,
-              sold,
-              capacity,
-              isSoldOut,
-            };
-          });
-        }
-        return ret;
-      },
-    },
-    toObject: {
-      transform: (doc, ret) => {
-        ret.id = ret._id;
-        delete ret._id;
-        delete ret.__v;
-        if (ret.category && typeof ret.category === "object" && ret.category.name) {
-          ret.categoryName = ret.category.name;
-          ret.category =
-            ret.category.name.toLowerCase() === "music & concerts"
-              ? "Music & Concerts"
-              : ret.category.name;
-        } else if (ret.category && String(ret.category) === "6ad3dbd83ca63b1d2ed0db41") {
-          ret.category = "Music & Concerts";
-        }
-        const rawTitle = ret.title || "";
-        const isBurna =
-          /burna\s*boy/i.test(rawTitle) ||
-          /weakness/i.test(rawTitle) ||
-          String(ret.id || ret._id) === "6ad685c5b93e2a37ef3dd857" ||
-          ret.slug === "burna-boy-live-no-sign-of-weakness-tour";
-
-        const isMarlian =
-          /marlian/i.test(rawTitle) ||
-          String(ret.id || ret._id) === "6ad8cdaa04730d435e513b1a";
-
-        const isWetParty =
-          /wet\s*party/i.test(rawTitle) ||
-          String(ret.id || ret._id) === "event-wet-party-coming-soon";
-
-        if (isBurna) {
-          ret.title = "Beach Vibez and Music: Guest Artist Invited.";
-          ret.subtitle = "Beach Vibez & Music with special guest artists invited live at Landmark Beach.";
-          ret.description = "Experience an unforgettable beach party with high-energy live music, seaside chill vibes, and special guest artist performances at Landmark Beach Arena, Victoria Island.";
-          ret.isClickable = false;
-          ret.comingSoon = true;
-          ret.priceDisplay = "Coming Soon";
-          ret.displayDate = "Coming Soon";
-          ret.formattedDate = "Coming Soon";
-          ret.organizer = ret.organizer || {};
-          ret.organizer.name = "Passiq Events";
-          ret.organizer.handle = "Admin-Passiq";
-          ret.organizer.avatar = "/passiq-logo.png";
-          ret.organizer.verified = true;
-          ret.organizer.partner = "";
-          ret.organizer.officialPartner = "";
-          ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
-        } else if (isWetParty) {
-          ret.isClickable = false;
-          ret.comingSoon = true;
-          ret.priceDisplay = "Coming Soon";
-          ret.displayDate = "Coming Soon";
-          ret.formattedDate = "Coming Soon";
-          ret.organizer = ret.organizer || {};
-          ret.organizer.name = "Passiq Events";
-          ret.organizer.handle = "Admin-Passiq";
-          ret.organizer.avatar = "/passiq-logo.png";
-          ret.organizer.verified = true;
-          ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
-        } else if (
-          ret.organizer &&
-          (isMarlian ||
-            ret.organizer.name === "agborex" ||
-            !ret.organizer.name ||
-            ret.organizer.name.includes("Sample"))
-        ) {
-          ret.organizer.name = "House Of Naya";
-          if (
-            !ret.organizer.handle ||
-            ret.organizer.handle === "organizer" ||
-            ret.organizer.handle.includes("sample")
-          ) {
-            ret.organizer.handle = "Admin-House Of Naya";
-          }
-          if (!ret.organizer.partner) {
-            ret.organizer.partner = "KRD (Kelvin Records)";
-            ret.organizer.officialPartner = "KRD (Kelvin Records)";
-          }
-          if (!ret.organizer.enquiries) {
-            ret.organizer.enquiries = "+234 916 063 7438, +234 708 819 8268";
-          }
-        }
-        if (isMarlian) {
-          ret.capacity = 8000;
-          ret.soldCount = 340;
-          ret.ticketsSold = 340;
-          ret.revenue = 5725000;
-          ret.earned = 5725000;
-          ret.earnedKobo = 572500000;
-          ret.grossKobo = 572500000;
-        }
-        if (Array.isArray(ret.ticketTiers)) {
-          ret.ticketTiers = ret.ticketTiers.map((t) => {
-            const isEarlyBirdReg =
-              /early\s*bird.*regular/i.test(t.name || "") ||
-              (/early\s*bird/i.test(t.name || "") && !/vip/i.test(t.name || ""));
-            const isEarlyBirdVip =
-              /early\s*bird.*vip/i.test(t.name || "") ||
-              /early\s*vip/i.test(t.name || "");
-            let sold = t.sold || 0;
-            let capacity = t.capacity;
-            if (isMarlian) {
-              if (isEarlyBirdReg) {
-                sold = 285;
-                capacity = 127;
-              } else if (isEarlyBirdVip) {
-                sold = 13;
-                capacity = 100;
-              } else if (/regular\s*vip/i.test(t.name || "")) {
-                sold = 16;
-                capacity = 2773;
-              } else if (/regular/i.test(t.name || "")) {
-                sold = 26;
-                capacity = 5000;
-              }
-            }
-            const isSoldOut =
-              (isMarlian && (isEarlyBirdReg || isEarlyBirdVip)) ||
-              t.isSoldOut === true ||
-              t.soldOut === true ||
-              Boolean(capacity > 0 && sold >= capacity);
-            return {
-              ...t,
-              sold,
-              capacity,
-              isSoldOut,
-            };
-          });
-        }
-        return ret;
-      },
-    },
+    toJSON: { transform: transformEvent },
+    toObject: { transform: transformEvent },
   },
 );
 
+// ──────────────────────────────────────
+// Response shaping (shared by toJSON and toObject)
+// Everything here is derived from the document itself. No event-specific values.
+// ──────────────────────────────────────
+function transformEvent(doc, ret) {
+  ret.id = ret._id;
+  delete ret._id;
+  delete ret.__v;
+
+  // Populated category -> readable name (id stays available as categoryId)
+  if (ret.category && typeof ret.category === "object" && ret.category.name) {
+    ret.categoryId = ret.category._id || ret.category.id;
+    ret.categoryName = ret.category.name;
+    ret.category = ret.category.name;
+  }
+
+  // Sales figures calculated from the ticket tiers stored in the database
+  if (Array.isArray(ret.ticketTiers)) {
+    ret.ticketTiers = ret.ticketTiers.map((t) => {
+      const sold = Number(t.sold) || 0;
+      const capacity = Number(t.capacity) || 0;
+      return {
+        ...t,
+        sold,
+        isSoldOut: t.isSoldOut === true || (capacity > 0 && sold >= capacity),
+      };
+    });
+
+    if (ret.ticketTiers.length > 0) {
+      const tierSold = ret.ticketTiers.reduce((s, t) => s + t.sold, 0);
+      const revenue = ret.ticketTiers.reduce(
+        (s, t) => s + t.sold * (Number(t.price) || 0),
+        0,
+      );
+      ret.soldCount = tierSold;
+      ret.ticketsSold = tierSold;
+      ret.revenue = revenue;
+      ret.earned = revenue;
+      ret.earnedKobo = Math.round(revenue * 100);
+      ret.grossKobo = Math.round(revenue * 100);
+    }
+  }
+
+  if (ret.ticketsSold === undefined) ret.ticketsSold = ret.soldCount || 0;
+
+  // "Coming soon" presentation comes from the stored flag
+  if (ret.comingSoon) {
+    ret.isClickable = false;
+    ret.priceDisplay = "Coming Soon";
+    ret.displayDate = "Coming Soon";
+    ret.formattedDate = "Coming Soon";
+  } else {
+    ret.isClickable = true;
+  }
+
+  return ret;
+}
+
+// ──────────────────────────────────────
+// Indexes
+// ──────────────────────────────────────
+eventSchema.index({ ownerId: 1, createdAt: -1 });
+eventSchema.index({ status: 1, date: 1 });
+
+// ──────────────────────────────────────
+// Hooks
+// ──────────────────────────────────────
 eventSchema.pre("validate", async function () {
   if (!this.statsToken) {
     this.statsToken = crypto.randomBytes(24).toString("hex");
   }
 
-  if (!this.isModified("title") && this.slug) return;
+  // Keep the stored summary fields in step with the tiers
+  if (Array.isArray(this.ticketTiers) && this.ticketTiers.length > 0) {
+    const prices = this.ticketTiers.map((t) => Number(t.price) || 0);
+    this.minPrice = Math.min(...prices);
+    this.maxPrice = Math.max(...prices);
+    this.price = this.minPrice;
+    this.soldCount = this.ticketTiers.reduce(
+      (s, t) => s + (Number(t.sold) || 0),
+      0,
+    );
+  }
 
-  const base = slugify(this.title, { lower: true, strict: true });
+  // Only generate / normalise the slug when it is new, empty or was edited.
+  // Changing the title alone no longer rewrites an existing public URL.
+  const needsSlug = !this.slug || this.isModified("slug");
+  if (!needsSlug) return;
+
+  const base =
+    slugify(this.slug || this.title, { lower: true, strict: true }) || "event";
   let slug = base;
   let count = 1;
 

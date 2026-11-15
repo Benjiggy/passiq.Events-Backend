@@ -1,6 +1,11 @@
+const mongoose = require("mongoose");
 const dataStore = require("../models/dataStore");
 const { PLATFORM_POLICY } = require("../config/constants");
 const { toKobo, toNaira } = require("../utils/formatters");
+const Order = require("../models/Order");
+const Ticket = require("../models/Ticket");
+const { isDbConnected } = require("../config/db");
+const SOLD_TICKET_STATUSES = new Set(["valid", "used"]);
 
 class FinanceService {
   /**
@@ -144,11 +149,12 @@ class FinanceService {
     );
 
     // Retrieve all successful orders
-    const allSuccessfulOrders = (await dataStore.listOrdersByOwner ? null : null) || [];
+    const allSuccessfulOrders =
+      ((await dataStore.listOrdersByOwner) ? null : null) || [];
     let dbOrders = [];
     try {
-      const Order = require("../models/Order");
-      const { isDbConnected } = require("../config/db");
+      // const Order = require("../models/Order");
+      // const { isDbConnected } = require("../config/db");
       if (isDbConnected()) {
         dbOrders = await Order.find({ status: "success" });
       }
@@ -203,8 +209,10 @@ class FinanceService {
           (earning) => toId(earning.eventId) === eId,
         );
         if (eventEarning) {
-          if (eventEarning.tickets > ticketsSold) ticketsSold = eventEarning.tickets;
-          if (eventEarning.grossKobo > grossKobo) grossKobo = eventEarning.grossKobo;
+          if (eventEarning.tickets > ticketsSold)
+            ticketsSold = eventEarning.tickets;
+          if (eventEarning.grossKobo > grossKobo)
+            grossKobo = eventEarning.grossKobo;
         } else if (isMarlian && hostMatch.ticketsSold > ticketsSold) {
           ticketsSold = hostMatch.ticketsSold;
           grossKobo = hostMatch.earnedKobo;
@@ -244,6 +252,182 @@ class FinanceService {
         eventCount: publishedEvents.length,
         ticketsSold: finalTicketsSold,
         grossKobo: finalGrossKobo,
+      },
+      events: eventList,
+    };
+  }
+
+  //ticket reconciliation for all events or a specific event
+  //////////
+  static async getTicketReconciliation({ eventId } = {}) {
+    if (!isDbConnected()) {
+      throw new Error("Database is not connected");
+    }
+
+    const match = {};
+    if (eventId) {
+      if (!mongoose.Types.ObjectId.isValid(eventId)) {
+        throw new Error("Invalid eventId");
+      }
+      match.eventId = new mongoose.Types.ObjectId(eventId);
+    }
+
+    // One database round trip for tickets, one for events, in parallel
+    const [rows, eventDocs] = await Promise.all([
+      Ticket.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: {
+              eventId: "$eventId",
+              tierId: "$tierId",
+              status: "$status",
+              isDemo: { $ifNull: ["$isDemo", false] },
+            },
+            count: { $sum: 1 },
+            amount: { $sum: { $ifNull: ["$unitPrice", 0] } },
+            tierName: { $first: { $ifNull: ["$tierName", "$ticketType"] } },
+            eventTitle: { $first: "$eventTitle" },
+          },
+        },
+      ]),
+      dataStore.listEvents(),
+    ]);
+
+    const idOf = (v) => (v ? String(v._id || v.id || v) : "");
+    const events = new Map();
+
+    const getEvent = (id, title) => {
+      if (!events.has(id)) {
+        events.set(id, {
+          eventId: id,
+          title: title || null,
+          existsInEvents: false,
+          ticketsSold: 0,
+          grossNaira: 0,
+          excluded: { total: 0, byStatus: {} },
+          recorded: null,
+          difference: null,
+          tiers: new Map(),
+        });
+      }
+      const e = events.get(id);
+      if (!e.title && title) e.title = title;
+      return e;
+    };
+
+    const getTier = (evt, tierId, tierName) => {
+      if (!evt.tiers.has(tierId)) {
+        evt.tiers.set(tierId, {
+          tierId,
+          tierName: tierName || null,
+          existsInEvent: false,
+          price: null,
+          ticketsSold: 0,
+          grossNaira: 0,
+          excluded: { total: 0, byStatus: {} },
+          recordedSold: null,
+          recordedCapacity: null,
+          difference: null,
+        });
+      }
+      const t = evt.tiers.get(tierId);
+      if (!t.tierName && tierName) t.tierName = tierName;
+      return t;
+    };
+
+    // 1. Tickets: count what was really issued
+    const totals = {
+      ticketsIssued: 0,
+      ticketsSold: 0,
+      grossNaira: 0,
+      excluded: { total: 0, byStatus: {} },
+    };
+
+    for (const row of rows) {
+      const { eventId: eId, tierId, status, isDemo } = row._id;
+      const evt = getEvent(idOf(eId), row.eventTitle);
+      const tier = getTier(evt, String(tierId || "unknown"), row.tierName);
+
+      totals.ticketsIssued += row.count;
+
+      const counted = SOLD_TICKET_STATUSES.has(status) && !isDemo;
+      if (counted) {
+        evt.ticketsSold += row.count;
+        evt.grossNaira += row.amount;
+        tier.ticketsSold += row.count;
+        tier.grossNaira += row.amount;
+        totals.ticketsSold += row.count;
+        totals.grossNaira += row.amount;
+      } else {
+        const key = isDemo ? `${status} (demo)` : status;
+        for (const bucket of [evt.excluded, tier.excluded, totals.excluded]) {
+          bucket.total += row.count;
+          bucket.byStatus[key] = (bucket.byStatus[key] || 0) + row.count;
+        }
+      }
+    }
+
+    // 2. Event documents: attach what the database currently records
+    for (const doc of eventDocs) {
+      const id = idOf(doc);
+      if (eventId && id !== String(eventId)) continue;
+
+      const evt = getEvent(id, doc.title);
+      evt.existsInEvents = true;
+      evt.title = doc.title || evt.title;
+
+      let recordedTierSold = 0;
+      for (const t of doc.ticketTiers || []) {
+        const tier = getTier(evt, idOf(t), t.name);
+        tier.existsInEvent = true;
+        tier.tierName = t.name || tier.tierName;
+        tier.price = t.price ?? null;
+        tier.recordedSold = Number(t.sold) || 0;
+        tier.recordedCapacity = Number(t.capacity) || 0;
+        tier.difference = tier.ticketsSold - tier.recordedSold;
+        recordedTierSold += tier.recordedSold;
+      }
+
+      evt.recorded = {
+        tierSoldTotal: recordedTierSold,
+        soldCount: Number(doc.soldCount) || 0,
+        capacity: Number(doc.capacity) || 0,
+      };
+      evt.difference = evt.ticketsSold - recordedTierSold;
+    }
+
+    // 3. Shape the response
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const eventList = [...events.values()]
+      .map((e) => ({
+        ...e,
+        grossNaira: round2(e.grossNaira),
+        grossKobo: Math.round(e.grossNaira * 100),
+        tiers: [...e.tiers.values()]
+          .map((t) => ({
+            ...t,
+            grossNaira: round2(t.grossNaira),
+            grossKobo: Math.round(t.grossNaira * 100),
+          }))
+          .sort((a, b) => b.ticketsSold - a.ticketsSold),
+      }))
+      .sort((a, b) => b.ticketsSold - a.ticketsSold);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      note: "Counted tickets have status valid/used and are not demo. Amounts use each ticket's unitPrice (naira).",
+      totals: {
+        ...totals,
+        grossNaira: round2(totals.grossNaira),
+        grossKobo: Math.round(totals.grossNaira * 100),
+        eventsWithTickets: eventList.filter((e) => e.ticketsSold > 0).length,
+        eventsMismatched: eventList.filter(
+          (e) => e.difference !== null && e.difference !== 0,
+        ).length,
+        ticketsForMissingEvents: eventList
+          .filter((e) => !e.existsInEvents)
+          .reduce((s, e) => s + e.ticketsSold, 0),
       },
       events: eventList,
     };

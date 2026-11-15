@@ -23,7 +23,7 @@ class EventController {
         success: true,
         status: "success",
         events,
-        data: events,
+        // data: events,
         total: events.length,
       });
     } catch (error) {
