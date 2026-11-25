@@ -200,8 +200,7 @@ class EventController {
 
       if (
         (event.ownerId?.id || event.ownerId)?.toString() !==
-          req.user.id.toString() &&
-        req.user.role !== "admin"
+        req.user.id.toString()
       ) {
         return ApiResponse.error(
           res,
@@ -234,8 +233,7 @@ class EventController {
 
       if (
         (event.ownerId?.id || event.ownerId)?.toString() !==
-          req.user.id.toString() &&
-        req.user.role !== "admin"
+        req.user.id.toString()
       ) {
         return ApiResponse.error(res, "Access denied.", 403);
       }
@@ -263,8 +261,7 @@ class EventController {
 
       if (
         (event.ownerId?.id || event.ownerId)?.toString() !==
-          req.user.id.toString() &&
-        req.user.role !== "admin"
+          req.user.id.toString() 
       ) {
         return ApiResponse.error(res, "Access denied.", 403);
       }
